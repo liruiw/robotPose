@@ -134,7 +134,7 @@ class Camera_VTK():
 
 
 	def append_abs_name(self,name):
- 		return '/home/liruiw/Projects/Optical-Manipulation/leroy_ws/src/project_arm/include/models/%s.DAE'%name
+ 		return 'baxter_models/%s.DAE'%name
  		#return '/home/liruiw/Projects/Optical-Manipulation/leroy_ws/src/convert_collada/pycollada/examples/dae_test/Pigeon/pigeon_17/dae/%s.DAE'%name
 
 	def apply_transform(self,transformList, id=-1):

@@ -37,13 +37,17 @@ import numpy.random as random
 from numpy.linalg import inv, norm
 from kdl_parser import kdl_tree_from_urdf_model
 from urdf_parser_py.urdf import URDF
+
 def mkdir_if_missing(dst_dir):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
+
 def deg2rad(deg):
     return deg/180.0*np.pi
+
 def rad2deg(rad):
     return rad/np.pi*180
+
 class robot_kinematics(object):
     """
     Robot Kinematics with PyKDL
@@ -52,11 +56,11 @@ class robot_kinematics(object):
         #self._baxter = URDF.from_parameter_server(key='robot_description')
 
         if robot == 'panda':
-            self._robot = URDF.from_xml_string(open('/home/liruiw/Projects/robotPose/panda_arm.urdf', 'r+').read())
+            self._robot = URDF.from_xml_string(open('panda_arm.urdf', 'r+').read())
             self._base_link = robot +'_link0'
             self._tip_link = robot +'_link7' #hard coded
         else: #baxter right limb
-            self._robot = URDF.from_xml_string(open('/home/liruiw/Projects/robotPose/baxter_base.urdf', 'r+').read())
+            self._robot = URDF.from_xml_string(open('baxter_base.urdf', 'r+').read())
             self._base_link = 'base'
             self._tip_link = 'right_wrist' 
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
@@ -179,12 +183,12 @@ def main():
     print 'robot name', args.robot
     if args.robot == 'panda':
         base_link='panda_link0'
-    for j in range(10):
-        index = random.randint(0,87045)
-        file = sio.loadmat('/local/nas/liruiw/arun_baxter/real_data/%06d-meta.mat'%index)
+
+    for index in range(5):
+        file = sio.loadmat('sample_data/%06d-meta.mat'%index)
         #poses = robot.solve_poses_from_joint(np.array([ 0, 30, 15, 45,0,25, 0])) #panda and baxter have dof 7, we are interested in 6
         pose_cam = file['poses']
-        arm_test_image = cv2.imread('/local/nas/liruiw/arun_baxter/real_data/%06d-color.png'%index)
+        arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
         for i in range(7):
             pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
@@ -192,9 +196,10 @@ def main():
         #pose_r = robot.solve_poses_from_joint(np.array([0,0,0,0,0,0,0]))
         joints = robot.solve_joint_from_poses(pose_r,base_link) 
         poses = robot.solve_poses_from_joint(joints,base_link) 
-        arm_test_image = cv2.imread('/local/nas/liruiw/arun_baxter/real_data/%06d-color.png'%index)
+        arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         arm_color, arm_depth = vtk_model.apply_transform(r2c(poses))
         arm_test_image[arm_depth!=0] = arm_color[arm_depth!=0]
-        cv2.imwrite( 'test_image/%06d-color.png'%j,arm_test_image)
+        cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
+
 if __name__ == "__main__":
     main()
