@@ -1,0 +1,11 @@
+*.mat
+*.mex*
+*.pyc
+*.tgz
+*.so
+*.o
+*.obj
+*.mtl
+*.xml
+*.png
+test_image
