@@ -16,11 +16,11 @@ from project_util import *
 import convertPoly
 class Camera_VTK():
 	"""
-	class to project a 3D world coordinate onto a 2D image plane using VTK
+	class to synthesize robot models
 	"""
 
 
-	def __init__(self, visualize=False): #K, near, far, extrinsics can be inputs.
+	def __init__(self, name='baxter', visualize=False): #K, near, far, extrinsics can be inputs.
 		self.w = 640
 		self.h = 480
 		self.K = np.eye(3)
@@ -38,7 +38,11 @@ class Camera_VTK():
 		self.iren = vtk.vtkRenderWindowInteractor()
 		self.actor_list = []
 		self.axes_list =  []
-		self.file_list = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']#['E0','S0','W0','E1','S1','W1','W2','G1','G2']
+		self.name = name
+		if self.name == 'baxter':
+			self.file_list = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']#['E0','S0','W0','E1','S1','W1','W2','G1','G2']
+		elif self.name == 'panda_arm':
+			self.file_list = ['link0', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6']
 		self.transform_list = [] # new*old^-1 would be the relative transform
 		self.init_vtk()
 		self.param=[int(cv2.IMWRITE_PNG_COMPRESSION), 5]
@@ -120,7 +124,7 @@ class Camera_VTK():
 		cam.SetWindowCenter(wcx, wcy)
 
 		# Set vertical view angle as a indirect way of setting the y focal distance
-		angle = 180 / np.pi * 2.0 * np.arctan2(self.h / 2.0, self.f[1]) #haven't checked yet
+		angle = 180 / np.pi * 2.0 * np.arctan2(self.h / 2.0, self.f[1]) 
 		cam.SetViewAngle(angle)
 
 		# Set the image aspect ratio as an indirect way of setting the x focal distance
@@ -133,9 +137,8 @@ class Camera_VTK():
 		cam.SetUserTransform(t)
 
 
-	def append_abs_name(self,name):
- 		return 'baxter_models/%s.DAE'%name
- 		#return '/home/liruiw/Projects/Optical-Manipulation/leroy_ws/src/convert_collada/pycollada/examples/dae_test/Pigeon/pigeon_17/dae/%s.DAE'%name
+	def append_abs_name(self,model_name):
+ 		return '%s_models/%s.DAE'%(self.name,model_name)
 
 	def apply_transform(self,transformList, id=-1):
 		# Set basic camera parameters in VTK added coordinates		
@@ -170,16 +173,14 @@ class Camera_VTK():
 		self.renWin.Render()
 		if self.vis:
 			self.iren.Start()#this thing stuck the flow, is an event loop
-		return self.screenshot()
+		return self.render_image()
 	
-	def apply_one_transform(self,transformList, id=-1):
-		pass
 	def setUserTransform(self, actors, transform):
 		for actor in actors:
 			actor.SetUserTransform(transform)
 
 
-	def screenshot(self):
+	def render_image(self):
 		#display the depth and color screenshots from the camera perspective, and return np arrays
 		winToIm = vtk.vtkWindowToImageFilter()
 		winToIm.SetInput(self.renWin)

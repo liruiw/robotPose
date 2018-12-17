@@ -55,14 +55,15 @@ class robot_kinematics(object):
     def __init__(self, robot):
         #self._baxter = URDF.from_parameter_server(key='robot_description')
 
-        if robot == 'panda':
+        if robot == 'panda_arm':
             self._robot = URDF.from_xml_string(open('panda_arm.urdf', 'r+').read())
-            self._base_link = robot +'_link0'
-            self._tip_link = robot +'_link7' #hard coded
+            self._base_link = 'panda_link0'
+            self._tip_link = 'panda_link7' #hard coded
         else: #baxter right limb
             self._robot = URDF.from_xml_string(open('baxter_base.urdf', 'r+').read())
             self._base_link = 'base'
             self._tip_link = 'right_wrist' 
+
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
          #we are not interested in gripper
@@ -71,15 +72,6 @@ class robot_kinematics(object):
                                                   self._tip_link)
         self._joint_names = self.get_kdl_chain(False)
         # KDL Solvers not used for now
-        # self._fk_p_kdl = PyKDL.ChainFkSolverPos_recursive(self._arm_chain)
-        # self._fk_v_kdl = PyKDL.ChainFkSolverVel_recursive(self._arm_chain)
-        # self._ik_v_kdl = PyKDL.ChainIkSolverVel_pinv(self._arm_chain)
-        # self._ik_p_kdl = PyKDL.ChainIkSolverPos_NR(self._arm_chain,
-        #                                            self._fk_p_kdl,
-        #                                            self._ik_v_kdl)
-        # self._jac_kdl = PyKDL.ChainJntToJacSolver(self._arm_chain)
-        # self._dyn_kdl = PyKDL.ChainDynParam(self._arm_chain,
-        #                                     PyKDL.Vector.Zero())
 
     def print_robot_description(self):
         nf_joints = 0
@@ -119,6 +111,7 @@ class robot_kinematics(object):
             segment = self._arm_chain.getSegment(idx)
             joint2tip = segment.getFrameToTip()
             pose_j2t = np.eye(4) 
+            
             for i in range(3):
                 for j in range(4):
                     pose_j2t[i,j] = joint2tip[i,j]    
@@ -137,20 +130,21 @@ class robot_kinematics(object):
         joint_values = np.insert(joint_values,0,np.zeros(num)) # base to the interested joint
         joint_values = deg2rad(joint_values)
         cur_pose = np.eye(4)
-        #print self._arm_chain.getNrOfSegments()
         for idx in xrange(self._arm_chain.getNrOfSegments()):
             pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
+            print self._arm_chain.getSegment(idx).getName()
             pose_end = np.eye(4)
             for i in range(3):
                 for j in range(4):
                     pose_end[i,j] = pose_[i,j]
             cur_pose = cur_pose.dot(pose_end)
             poses.append(cur_pose.copy())
-        return poses[num:]  #we don't need the first two
+        return poses[num:]  #
 
 
 camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
 camera_intrinsics=np.array([[525, 0, 319.5],[ 0, 525, 239.5],[0, 0, 1]])
+
 def to4x4(T): 
     new_T = np.zeros([4,4])
     new_T[:3,:4] = T
@@ -162,39 +156,36 @@ def r2c(T_list):
         res.append((camera_extrinsics.dot(T))[:3,:])
     return res
 
-def perpendicular(v):
-    if (v[0]==0) and (v[1]==0):
-        if (v[2]==0):
-            raise ValueError('zero vector')
-        return np.array([0, 1, 0])
-    return np.array([-v[1], v[0], 0])
-
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
     args = parser.parse_args()
     robot = robot_kinematics(args.robot)
-    from baxter_synthesizer import Camera_VTK
+    from robot_synthesizer import Camera_VTK
     import cv2
-    vtk_model = Camera_VTK(visualize=False)
     mkdir_if_missing('test_image')
-    base_link='right_arm_mount'
     print 'robot name', args.robot
-    if args.robot == 'panda':
+    if args.robot == 'panda_arm':
         base_link='panda_link0'
-
-    for index in range(5):
+        vtk_model = Camera_VTK(args.robot,visualize=True)
+    elif args.robot == 'baxter':
+        base_link='right_arm_mount'
+        vtk_model = Camera_VTK(args.robot,visualize=False)
+    for index in range(1):
         file = sio.loadmat('sample_data/%06d-meta.mat'%index)
-        #poses = robot.solve_poses_from_joint(np.array([ 0, 30, 15, 45,0,25, 0])) #panda and baxter have dof 7, we are interested in 6
+        #panda and baxter have dof 7, we are interested in 6
         pose_cam = file['poses']
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
+        
         for i in range(7):
             pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
             pose_r[:,:,i] = pose_i
         #pose_r = robot.solve_poses_from_joint(np.array([0,0,0,0,0,0,0]))
-        joints = robot.solve_joint_from_poses(pose_r,base_link) 
+
+        #joints = robot.solve_joint_from_poses(pose_r,base_link)
+        joints =  np.array([0,0,0,0,0,0,0])
         poses = robot.solve_poses_from_joint(joints,base_link) 
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         arm_color, arm_depth = vtk_model.apply_transform(r2c(poses))

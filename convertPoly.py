@@ -115,25 +115,19 @@ def colladaGeometryToPolyData(scene):
     for geom in scene.objects('geometry'):
         #print geom.primitives()
         for prim in geom.primitives():
-            #print type(prim)
-
-            if type(prim) == collada.polylist.Polylist or collada.polylist.BoundPolylist:
-                if type(prim) == collada.lineset.BoundLineSet: #special case in G2, need to fix
-                    continue
+            if type(prim) == collada.polylist.BoundPolylist:
                 prim = prim.triangleset() # won't work
             mat = prim.material
-
             material = []
-            for prop in mat.effect.supported:
-                value = getattr(mat.effect, prop)
-                if value is not None:
-                    material.append((prop, value))
-               # print 'warning, unhandled primitive type:', type(primitives)
-                #continue
-            polyData = colladaPolygonToPolyData(prim, material)
+            polyData = None
+            if mat:
+                for prop in mat.effect.supported:
+                    value = getattr(mat.effect, prop)
+                    if value is not None:
+                        material.append((prop, value))
+                polyData = colladaPolygonToPolyData(prim, material)
             if not polyData:
                 continue
-
             #addTextureMetaData(polyData, primitives.material)
            # polyData = transformPolyData(polyData)
             polyDataList.append(polyData)
@@ -146,8 +140,6 @@ def colladaPolygonToPolyData(tris, material):
     vertex_index = tris.vertex_index
     normal_index = tris.normal_index
     #texcoord_index = tris.texcoord_indexset[0]
-
-
     vtList = []
     vtMap = {}
     faces = []
@@ -238,8 +230,6 @@ def colladaToPolyData(inFile, outFile):
     #polyDataList = colladaToPolyData(f)
     if not polyDataList:
         return
-
-
 
 if __name__ == '__main__':
 
