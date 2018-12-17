@@ -116,7 +116,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(usage='Load an URDF file')
     parser.add_argument('file', type=argparse.FileType('r'), nargs='?',
-        default='/home/liruiw/Projects/urdf2kdl/baxter_base.urdf.xacro', help='The URDF file')
+        default='/home/liruiw/Projects/urdf2kdl/baxter_base.urdf', help='The URDF file')
     args = parser.parse_args()
     robot = URDF.from_xml_string(args.file.read()) #urdf.Robot.from_xml_file(sys.argv[1])
     num_non_fixed_joints = 0
