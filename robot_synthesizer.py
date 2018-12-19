@@ -15,8 +15,6 @@ class Camera_VTK():
 	"""
 	class to synthesize robot models
 	"""
-
-
 	def __init__(self, name='baxter', visualize=False): #K, near, far, extrinsics can be inputs.
 		self.w = 640
 		self.h = 480
@@ -139,7 +137,7 @@ class Camera_VTK():
 	def append_abs_name(self,model_name):
  		return '%s_models/%s.DAE'%(self.name,model_name)
 
-	def apply_transform(self,transformList, id=-1):
+	def render_pose(self,transformList, id=-1):
 		# Set basic camera parameters in VTK added coordinates		
 		for i in range(len(self.transform_list)):
 			if id == -1:
