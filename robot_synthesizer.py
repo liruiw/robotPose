@@ -39,7 +39,7 @@ class Camera_VTK():
 		if self.name == 'baxter':
 			self.file_list = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']#['E0','S0','W0','E1','S1','W1','W2','G1','G2']
 		elif self.name == 'panda_arm':
-			self.file_list = ['link0', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6']
+			self.file_list = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
 		self.transform_list = [] # new*old^-1 would be the relative transform
 		self.init_vtk()
 		self.param=[int(cv2.IMWRITE_PNG_COMPRESSION), 5]

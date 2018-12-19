@@ -135,6 +135,7 @@ class robot_kinematics(object):
         cur_pose = np.eye(4)
         for idx in xrange(self._arm_chain.getNrOfSegments()):
             pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
+            #print self._arm_chain.getSegment(idx)
             pose_end = np.eye(4)
             for i in range(3):
                 for j in range(4):
@@ -185,8 +186,6 @@ def main():
         for i in range(7):
             pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
             pose_r[:,:,i] = pose_i
-        #pose_r = robot.solve_poses_from_joint(np.array([0,0,0,0,0,0,0]))
-
         #joints = robot.solve_joint_from_poses(pose_r,base_link)
         joints =  np.array([0,0,0,0,0,0,0])
         poses = robot.solve_poses_from_joint(joints,base_link) 
