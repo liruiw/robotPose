@@ -6,10 +6,7 @@ import sys
 sys.path.append("/usr/local/lib/python2.7/site-packages/")
 import pymeshfix
 import vtk
-import rospy
 import math
-import tf
-import geometry_msgs.msg
 from vtk.util import numpy_support
 import cv2
 from project_util import *

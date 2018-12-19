@@ -28,9 +28,12 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+
 import PyKDL
+
 import scipy.io as sio
 from transforms3d.quaternions import quat2mat
+
 from transforms3d.axangles import mat2axangle
 import os
 import numpy.random as random
@@ -118,7 +121,7 @@ class robot_kinematics(object):
             #pose_joint = inv(tip2tip).dot(pose_j2t)
             pose_joint = inv(pose_j2t).dot(tip2tip)
             rotate_axis = segment.getJoint().JointAxis()
-            axis, angle = mat2axangle(pose_joint[:3,:3]) #seems ambiguous but correct
+            axis, angle = mat2axangle(pose_joint[:3,:3]) 
             joint_values.append(angle)
             cur_pose = poses[:,:,idx]
         return rad2deg(np.array(joint_values[num:])) 
@@ -132,7 +135,6 @@ class robot_kinematics(object):
         cur_pose = np.eye(4)
         for idx in xrange(self._arm_chain.getNrOfSegments()):
             pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
-            print self._arm_chain.getSegment(idx).getName()
             pose_end = np.eye(4)
             for i in range(3):
                 for j in range(4):
@@ -162,6 +164,7 @@ def main():
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
     args = parser.parse_args()
     robot = robot_kinematics(args.robot)
+
     from robot_synthesizer import Camera_VTK
     import cv2
     mkdir_if_missing('test_image')

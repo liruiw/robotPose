@@ -2,7 +2,7 @@
 ### Installation
 Install vtk, transforms3d
 ```Shell
-pip install vtk
+pip install vtk (conda install -c conda-forge vtk)
 pip install transforms3d
 ```
 Install urdf_parser_py from https://github.com/ros/urdf_parser_py
