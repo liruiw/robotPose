@@ -171,12 +171,10 @@ def main():
     mkdir_if_missing('test_image')
     print 'robot name', args.robot
     if args.robot == 'panda_arm':
-        base_link='panda_link0'
-        vtk_model = Camera_VTK(args.robot,visualize=True)
+        vtk_robot = Camera_VTK(args.robot,visualize=True) #for interaction
     elif args.robot == 'baxter':
-        base_link='right_arm_mount'
-        vtk_model = Camera_VTK(args.robot,visualize=False)
-    for index in range(1):
+        vtk_robot = Camera_VTK(args.robot,visualize=False)
+    for index in range(5):
         file = sio.loadmat('sample_data/%06d-meta.mat'%index)
         #panda and baxter have dof 7, we are interested in 6
         pose_cam = file['poses']
@@ -186,11 +184,12 @@ def main():
         for i in range(7):
             pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
             pose_r[:,:,i] = pose_i
-        #joints = robot.solve_joint_from_poses(pose_r,base_link)
-        joints =  np.array([0,0,0,0,0,0,0])
-        poses = robot.solve_poses_from_joint(joints,base_link) 
+        joints = robot.solve_joint_from_poses(pose_r,vtk_robot.base_link)
+        if args.robot == 'panda_arm':  #correspond with move_arm
+            joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])        
+        poses = robot.solve_poses_from_joint(joints,vtk_robot.base_link) 
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
-        arm_color, arm_depth = vtk_model.apply_transform(r2c(poses))
+        arm_color, arm_depth = vtk_robot.apply_transform(r2c(poses))
         arm_test_image[arm_depth!=0] = arm_color[arm_depth!=0]
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
 

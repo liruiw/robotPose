@@ -4,25 +4,38 @@ import tf
 #from lib.pair_matching.RT_transform import *
 import moveit_commander 
 import numpy as np
-def deg2ang(joint):
+import sys
+def deg2rad(joint):
 	return np.array(joint)*(np.pi/180.0)
-
-limb.move_to_joint_positions(angles)
+def rad2deg(joint):
+	return np.array(joint)*(180./np.pi)
 def main():
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
 	args = parser.parse_args()
 	if args.robot == 'baxter':
-		rospy.init_node('Hello_Baxter')
-		limb = baxter_interface.Limb('right')
-		set_joint = deg2ang([20,30,40,50,60,20,40]) #random angle?
-		angles['right_s0']=set_joint[0]
-		angles['right_s1']=set_joint[1]
-		angles['right_e0']=set_joint[2]
-		angles['right_e1']=set_joint[3]
-		angles['right_w0']=set_joint[4]
-		angles['right_w1']=set_joint[5]
-		angles['right_w2']=set_joint[6]
+		joint_state_topic = ['joint_states:=/robot/joint_states']
+		moveit_commander.roscpp_initialize(joint_state_topic)
+		rospy.init_node('move', anonymous=True)
+		robot = moveit_commander.RobotCommander()
+		gr = moveit_commander.MoveGroupCommander("right_arm")
+		#sample_data/000001 joint angles
+		set_joint = deg2rad([-11.44393148, -21.72985943,  64.88937589, 77.6455835,  5.26733262,71.97212335,  -2.96916723])
+		gr.set_joint_value_target(set_joint)
+		plan = gr.go(wait=True)
+		print rad2deg(gr.get_current_joint_values())
+	elif args.robot == 'panda_arm':
+		moveit_commander.roscpp_initialize(sys.argv)
+		rospy.init_node('move', anonymous=True)
+		robot = moveit_commander.RobotCommander()
+		scene = moveit_commander.PlanningSceneInterface()
+		group_name = "panda_arm"
+		#correspond with synthetic
+		set_joint = deg2rad([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])
+		group = moveit_commander.MoveGroupCommander(group_name)
+		group.set_joint_value_target(set_joint)
+		plan = group.go(wait=True)
+		print rad2deg(group.get_current_joint_values())
 if __name__ == "__main__":
 	main()
