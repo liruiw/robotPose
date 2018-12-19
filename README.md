@@ -38,3 +38,14 @@ To view panda arm synthesized interative UI, run
 ```Shell
 python robot_pykdl.py --robot=panda_arm
 ```
+To use Baxter, install baxter workspace from http://sdk.rethinkrobotics.com/wiki/Workstation_Setup
+To run simulation, install baxter_simulator from  http://sdk.rethinkrobotics.com/wiki/Simulator_Installation and Moveit from http://sdk.rethinkrobotics.com/wiki/MoveIt_Tutorial
+After you start the simulation, test moving the robot by
+```Shell
+python move_arm.py --robot=baxter
+```
+To run moveit with franka, follow the instructions here:http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/getting_started/getting_started.html
+After you start the simulation, test moving the robot by
+```Shell
+python move_arm.py --robot=panda_arm
+```
