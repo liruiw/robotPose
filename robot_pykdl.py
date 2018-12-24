@@ -3,13 +3,15 @@
 import numpy as np
 import PyKDL
 import scipy.io as sio
-from transforms3d.quaternions import quat2mat
+from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.axangles import mat2axangle
 import os
 import numpy.random as random
 from numpy.linalg import inv, norm
 from kdl_parser import kdl_tree_from_urdf_model
 from urdf_parser_py.urdf import URDF
+from ycb_renderer import YCBRenderer
+import torch
 
 def mkdir_if_missing(dst_dir):
     if not os.path.exists(dst_dir):
@@ -46,6 +48,7 @@ class robot_kinematics(object):
         self._arm_chain = self._kdl_tree.getChain(self._base_link,
                                                   self._tip_link)
         self._joint_name, self._joint_limits = self.get_joint_limit()
+        print self._joint_limits, self._joint_name
         # KDL Solvers not used for now
     def print_robot_description(self):
         nf_joints = 0
@@ -76,7 +79,6 @@ class robot_kinematics(object):
     def solve_joint_from_poses(self, pose, base_link='right_arm_mount'): #4x4x8
         joint_values = [] 
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
-
         if type(pose) == list:
             pose = list2M(pose)
         poses = np.zeros([4,4,pose.shape[-1]+num])
@@ -127,7 +129,7 @@ class robot_kinematics(object):
     def perturb_pose(self, pose, base_link='right_arm_mount', scale=5):
         joints_t = self.solve_joint_from_poses(pose, base_link)
         joints_p = joints_t + scale*np.random.randn(7)
-        while not self.check_joint_limits(joints_p):
+        while not self.check_joint_limits(joints_p,base_link):
             joints_p = joints_t + scale*np.random.randn(7)
         pose_p = self.solve_poses_from_joint(joints_p, base_link)
         return pose_p
@@ -162,33 +164,69 @@ def main():
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
     args = parser.parse_args()
     robot = robot_kinematics(args.robot)
+    width = 640 #800
+    height = 480 #600
 
-    from robot_synthesizer import Camera_VTK
+    #from robot_synthesizer import Camera_VTK
     import cv2
     mkdir_if_missing('test_image')
     print 'robot name', args.robot
+    renderer = YCBRenderer(width=width, height=height, render_marker=False, robot_name=args.robot)
     if args.robot == 'panda_arm':
-        vtk_robot = Camera_VTK(args.robot,visualize=True) #for interaction
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
+        obj_paths = [
+            '{}_models/{}.DAE'.format(args.robot,item) for item in models]
+        colors = [
+            [0.1*(idx+1),0,0] for idx in range(len(models))]
+        texture_paths = ['' for item in models]
+        base_link='panda_link0'
     elif args.robot == 'baxter':
-        vtk_robot = Camera_VTK(args.robot,visualize=False)
+        models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
+        obj_paths = [
+            '{}_models/{}.DAE'.format(args.robot,item) for item in models]
+        colors = [
+            [0.1*(idx+1),0,0] for idx in range(len(models))]
+        texture_paths = ['' for item in models]
+        base_link = 'right_arm_mount'
+    renderer.load_objects(obj_paths, texture_paths, colors)
+    cls_indexes = range(7) #7
+    renderer.set_camera([0, 0, 0],[0, 0, 1], [0, -1, 0] )
+    angle = 180 / np.pi * 2.0 * np.arctan2(480 / 2.0, 525)
+    renderer.set_fov(angle)
+    renderer.set_projection_matrix(640,480,525,525,319.5,239.5,0.001,1000) 
+    renderer.set_light_pos([2, 2, 1])
+    image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
+    seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     for index in range(5):
         file = sio.loadmat('sample_data/%06d-meta.mat'%index)
         #panda and baxter have dof 7, we are interested in 6
         pose_cam = file['poses']
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
-        
         for i in range(7):
             pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
-            pose_r[:,:,i] = pose_i
-        joints = robot.solve_joint_from_poses(pose_r,vtk_robot.base_link)
+            pose_r[:,:,i] = pose_i       
+        joints = robot.solve_joint_from_poses(pose_r,base_link)
         if args.robot == 'panda_arm':  #correspond with move_arm
             joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])        
-        poses = robot.solve_poses_from_joint(joints,vtk_robot.base_link) 
-        poses_p = robot.perturb_pose(poses,vtk_robot.base_link)
+        poses = robot.solve_poses_from_joint(joints,base_link) 
+        poses_p = robot.perturb_pose(poses,base_link)
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
-        arm_color, arm_depth = vtk_robot.render_pose(r2c(poses_p))
-        arm_test_image[arm_depth!=0] = arm_color[arm_depth!=0]
+        poses = []
+        for i in range(7):
+            pose_i = camera_extrinsics.dot(poses_p[i])
+            rot = mat2quat(pose_i[:3,:3])
+            trans = pose_i[:3,3]
+            poses.append(np.hstack((trans,rot))) 
+        renderer.set_poses(poses)
+        renderer.render(cls_indexes, image_tensor, seg_tensor)
+        image_tensor = image_tensor.flip(0)
+        seg_tensor = seg_tensor.flip(0)
+        image = cv2.cvtColor(image_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
+        mask = cv2.cvtColor(seg_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR) #
+        test_img = np.zeros(image.shape)
+        test_img[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]
+        arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]*255 #red channel
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
 
 camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
