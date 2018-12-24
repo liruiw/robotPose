@@ -81,13 +81,14 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(usage='Load an URDF file')
     parser.add_argument('file', type=argparse.FileType('r'), nargs='?',
-        default='/home/liruiw/Projects/urdf2kdl/baxter_base.urdf', help='The URDF file')
+        default='baxter_base.urdf', help='The URDF file')
     args = parser.parse_args()
     robot = URDF.from_xml_string(args.file.read()) #urdf.Robot.from_xml_file(sys.argv[1])
     num_non_fixed_joints = 0
-    print robot
+    #print robot.joints
     for joint in robot.joints:
-        print joint.name
+        if joint.limit:
+            print'joint limit', joint.name, joint.limit.lower,joint.limit.upper
         if joint.joint_type != 'fixed':
             num_non_fixed_joints += 1
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,

@@ -14,7 +14,11 @@ from urdf_parser_py.urdf import URDF
 def mkdir_if_missing(dst_dir):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
-
+def list2M(pose_list):
+    poses = np.zeros([4,4,len(pose_list)])
+    for idx, pose in enumerate(pose_list):
+        poses[:,:,idx] = pose
+    return poses
 def deg2rad(deg):
     return deg/180.0*np.pi
 
@@ -35,16 +39,14 @@ class robot_kinematics(object):
             self._robot = URDF.from_xml_string(open('baxter_base.urdf', 'r+').read())
             self._base_link = 'base'
             self._tip_link = 'right_wrist' 
-
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
          #we are not interested in gripper
         self._tip_frame = PyKDL.Frame()
         self._arm_chain = self._kdl_tree.getChain(self._base_link,
                                                   self._tip_link)
-        self._joint_names = self.get_kdl_chain(False)
+        self._joint_name, self._joint_limits = self.get_joint_limit()
         # KDL Solvers not used for now
-
     def print_robot_description(self):
         nf_joints = 0
         for j in self._robot.joints:
@@ -55,19 +57,28 @@ class robot_kinematics(object):
         print "URDF links: %d" % len(self._robot.links)
         print "KDL joints: %d" % self._kdl_tree.getNrOfJoints()
         print "KDL segments: %d" % self._kdl_tree.getNrOfSegments()
-
-    def get_kdl_chain(self, print_kdl_chain=False):
-        joints = [] #initial two angles
+    
+    def get_joint_limit(self, print_kdl_chain=False):
+        robot_description=self._robot
+        joint_limits = {}
+        joints = []
         for idx in xrange(self._arm_chain.getNrOfSegments()):
-            joint_name = self._arm_chain.getSegment(idx).getJoint().getName().encode("utf-8") #get rid of unicode
+            joint = self._arm_chain.getSegment(idx).getJoint()
+            joint_name = joint.getName().encode("utf-8") #get rid of unicode
             if print_kdl_chain:
                 print '* ' + joint_name
             joints.append(joint_name)
-        return joints
+        for joint in robot_description.joints:
+            if joint.limit and joint.name in joints:
+                joint_limits[joint.name] = [joint.limit.lower,joint.limit.upper]
+        return joints, joint_limits
 
     def solve_joint_from_poses(self, pose, base_link='right_arm_mount'): #4x4x8
         joint_values = [] 
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+
+        if type(pose) == list:
+            pose = list2M(pose)
         poses = np.zeros([4,4,pose.shape[-1]+num])
         for k in range(num):
             poses[:,:,k] = np.eye(4)
@@ -97,21 +108,41 @@ class robot_kinematics(object):
 
     def solve_poses_from_joint(self,joint_values=None,base_link='right_arm_mount'):
         poses = []
+        if self.check_joint_limits(joint_values, base_link=base_link):
+            num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+            joint_values = np.insert(joint_values,0,np.zeros(num)) # base to the interested joint
+            joint_values = deg2rad(joint_values)
+            cur_pose = np.eye(4)
+            for idx in xrange(self._arm_chain.getNrOfSegments()):
+                pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
+                #print self._arm_chain.getSegment(idx)
+                pose_end = np.eye(4)
+                for i in range(3):
+                    for j in range(4):
+                        pose_end[i,j] = pose_[i,j]
+                cur_pose = cur_pose.dot(pose_end)
+                poses.append(cur_pose.copy())
+            return poses[num:]  #
 
+    def perturb_pose(self, pose, base_link='right_arm_mount', scale=5):
+        joints_t = self.solve_joint_from_poses(pose, base_link)
+        joints_p = joints_t + scale*np.random.randn(7)
+        while not self.check_joint_limits(joints_p):
+            joints_p = joints_t + scale*np.random.randn(7)
+        pose_p = self.solve_poses_from_joint(joints_p, base_link)
+        return pose_p
+
+    def check_joint_limits(self, joint_values, base_link='right_arm_mount'):
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
-        joint_values = np.insert(joint_values,0,np.zeros(num)) # base to the interested joint
         joint_values = deg2rad(joint_values)
-        cur_pose = np.eye(4)
-        for idx in xrange(self._arm_chain.getNrOfSegments()):
-            pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
-            #print self._arm_chain.getSegment(idx)
-            pose_end = np.eye(4)
-            for i in range(3):
-                for j in range(4):
-                    pose_end[i,j] = pose_[i,j]
-            cur_pose = cur_pose.dot(pose_end)
-            poses.append(cur_pose.copy())
-        return poses[num:]  #
+        for idx in range(joint_values.shape[0]):    
+            joint_name = self._joint_name[num+idx]
+            lower_bound_check = joint_values[idx] >= self._joint_limits[joint_name][0]
+            upper_bound_check = joint_values[idx] <= self._joint_limits[joint_name][1]
+            if not (lower_bound_check and upper_bound_check):
+                print "{} joint limits exceeded! angle: {}".format(joint_name, joint_values[idx])
+                return False
+        return True
 
 def to4x4(T): 
     new_T = np.zeros([4,4])
@@ -154,8 +185,9 @@ def main():
         if args.robot == 'panda_arm':  #correspond with move_arm
             joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])        
         poses = robot.solve_poses_from_joint(joints,vtk_robot.base_link) 
+        poses_p = robot.perturb_pose(poses,vtk_robot.base_link)
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
-        arm_color, arm_depth = vtk_robot.render_pose(r2c(poses))
+        arm_color, arm_depth = vtk_robot.render_pose(r2c(poses_p))
         arm_test_image[arm_depth!=0] = arm_color[arm_depth!=0]
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
 
