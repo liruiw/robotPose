@@ -7,7 +7,7 @@ from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.axangles import mat2axangle
 import os
 import numpy.random as random
-from numpy.linalg import inv, norm
+from numpy.linalg import inv
 from kdl_parser import kdl_tree_from_urdf_model
 from urdf_parser_py.urdf import URDF
 from ycb_renderer import YCBRenderer
@@ -35,11 +35,9 @@ class robot_kinematics(object):
         #self._baxter = URDF.from_parameter_server(key='robot_description')
         if robot == 'panda_arm':
             self._robot = URDF.from_xml_string(open('panda_arm.urdf', 'r+').read())
-            self._base_link = 'panda_link0'
             self._tip_link = 'panda_link7' #hard coded
         else: #baxter right limb
             self._robot = URDF.from_xml_string(open('baxter_base.urdf', 'r+').read())
-            self._base_link = 'base'
             self._tip_link = 'right_wrist' 
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
@@ -50,6 +48,7 @@ class robot_kinematics(object):
         self._joint_name, self._joint_limits = self.get_joint_limit()
         print self._joint_limits, self._joint_name
         # KDL Solvers not used for now
+    
     def print_robot_description(self):
         nf_joints = 0
         for j in self._robot.joints:
@@ -62,6 +61,9 @@ class robot_kinematics(object):
         print "KDL segments: %d" % self._kdl_tree.getNrOfSegments()
     
     def get_joint_limit(self, print_kdl_chain=False):
+        """
+        Load joint limits from description file
+        """
         robot_description=self._robot
         joint_limits = {}
         joints = []
@@ -76,7 +78,11 @@ class robot_kinematics(object):
                 joint_limits[joint.name] = [joint.limit.lower,joint.limit.upper]
         return joints, joint_limits
 
-    def solve_joint_from_poses(self, pose, base_link='right_arm_mount'): #4x4x8
+    def solve_joint_from_poses(self, pose, base_link='right_arm_mount'): 
+        """
+        Input 4x4xn poses in robot coordinates, output list of joint angels in degrees.
+        Joints before base link assumes to have joint angle 0
+        """
         joint_values = [] 
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         if type(pose) == list:
@@ -84,7 +90,7 @@ class robot_kinematics(object):
         poses = np.zeros([4,4,pose.shape[-1]+num])
         for k in range(num):
             poses[:,:,k] = np.eye(4)
-            pose_ = self._arm_chain.getSegment(k).pose(0) #assume no angle
+            pose_ = self._arm_chain.getSegment(k).pose(0) 
             for i in range(3):
                 for j in range(4):
                     poses[i,j,k] = pose_[i,j]
@@ -96,11 +102,9 @@ class robot_kinematics(object):
             segment = self._arm_chain.getSegment(idx)
             joint2tip = segment.getFrameToTip()
             pose_j2t = np.eye(4) 
-            
             for i in range(3):
                 for j in range(4):
                     pose_j2t[i,j] = joint2tip[i,j]    
-            #pose_joint = inv(tip2tip).dot(pose_j2t)
             pose_joint = inv(pose_j2t).dot(tip2tip)
             rotate_axis = segment.getJoint().JointAxis()
             axis, angle = mat2axangle(pose_joint[:3,:3]) 
@@ -109,6 +113,9 @@ class robot_kinematics(object):
         return rad2deg(np.array(joint_values[num:])) 
 
     def solve_poses_from_joint(self,joint_values=None,base_link='right_arm_mount'):
+        """
+        Input joint angles in degrees, output poses list in robot coordinates 
+        """
         poses = []
         if self.check_joint_limits(joint_values, base_link=base_link):
             num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
@@ -117,7 +124,6 @@ class robot_kinematics(object):
             cur_pose = np.eye(4)
             for idx in xrange(self._arm_chain.getNrOfSegments()):
                 pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
-                #print self._arm_chain.getSegment(idx)
                 pose_end = np.eye(4)
                 for i in range(3):
                     for j in range(4):
@@ -127,10 +133,14 @@ class robot_kinematics(object):
             return poses[num:]  #
 
     def perturb_pose(self, pose, base_link='right_arm_mount', scale=5):
+        """
+        Perturb the initial pose based on joint angles
+        """
+        num = self._arm_chain.getNrOfSegments() - self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         joints_t = self.solve_joint_from_poses(pose, base_link)
-        joints_p = joints_t + scale*np.random.randn(7)
+        joints_p = joints_t + scale*np.random.randn(num)
         while not self.check_joint_limits(joints_p,base_link):
-            joints_p = joints_t + scale*np.random.randn(7)
+            joints_p = joints_t + scale*np.random.randn(num)
         pose_p = self.solve_poses_from_joint(joints_p, base_link)
         return pose_p
 
@@ -147,9 +157,8 @@ class robot_kinematics(object):
         return True
 
 def to4x4(T): 
-    new_T = np.zeros([4,4])
+    new_T = np.eye(4)
     new_T[:3,:4] = T
-    new_T[3,3] = 1
     return new_T
     
 def r2c(T_list):
@@ -171,7 +180,7 @@ def main():
     import cv2
     mkdir_if_missing('test_image')
     print 'robot name', args.robot
-    renderer = YCBRenderer(width=width, height=height, render_marker=False, robot_name=args.robot)
+    renderer = YCBRenderer(width=width, height=height, render_marker=False)
     if args.robot == 'panda_arm':
         models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
         obj_paths = [
@@ -194,7 +203,7 @@ def main():
     angle = 180 / np.pi * 2.0 * np.arctan2(480 / 2.0, 525)
     renderer.set_fov(angle)
     renderer.set_projection_matrix(640,480,525,525,319.5,239.5,0.001,1000) 
-    renderer.set_light_pos([2, 2, 1])
+    renderer.set_light_pos([0, -2, 1])
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     for index in range(5):
