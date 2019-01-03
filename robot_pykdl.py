@@ -203,7 +203,7 @@ def main():
     angle = 180 / np.pi * 2.0 * np.arctan2(480 / 2.0, 525)
     renderer.set_fov(angle)
     renderer.set_projection_matrix(640,480,525,525,319.5,239.5,0.001,1000) 
-    renderer.set_light_pos([0, -2, 1])
+    renderer.set_light_pos([0, 0, 1])
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     for index in range(5):
@@ -231,11 +231,16 @@ def main():
         renderer.render(cls_indexes, image_tensor, seg_tensor)
         image_tensor = image_tensor.flip(0)
         seg_tensor = seg_tensor.flip(0)
-        image = cv2.cvtColor(image_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
+
+        im = image_tensor.cpu().numpy()
+        im = np.clip(im, 0, 1)
+        im = im[:, :, (2, 1, 0)] * 255
+        image = im.astype(np.uint8)
+
         mask = cv2.cvtColor(seg_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR) #
         test_img = np.zeros(image.shape)
         test_img[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]
-        arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]*255 #red channel
+        arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
 
 camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
