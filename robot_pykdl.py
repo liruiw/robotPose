@@ -197,15 +197,15 @@ def main():
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
         base_link = 'right_arm_mount'
+
     renderer.load_objects(obj_paths, texture_paths, colors)
     cls_indexes = range(7) #7
-    renderer.set_camera([0, 0, 0],[0, 0, 1], [0, -1, 0] )
-    angle = 180 / np.pi * 2.0 * np.arctan2(480 / 2.0, 525)
-    renderer.set_fov(angle)
-    renderer.set_projection_matrix(640,480,525,525,319.5,239.5,0.001,1000) 
+    renderer.set_camera_default()
+    renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
     renderer.set_light_pos([0, 0, 1])
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
+
     for index in range(5):
         file = sio.loadmat('sample_data/%06d-meta.mat'%index)
         #panda and baxter have dof 7, we are interested in 6
