@@ -34,10 +34,12 @@ class robot_kinematics(object):
     def __init__(self, robot):
         #self._baxter = URDF.from_parameter_server(key='robot_description')
         if robot == 'panda_arm':
-            self._robot = URDF.from_xml_string(open('panda_arm.urdf', 'r+').read())
-            self._tip_link = 'panda_link7' #hard coded
+            cur_path = os.path.dirname(os.path.abspath(__file__))
+            self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'panda_arm.urdf'), 'r+').read())
+            self._tip_link = 'panda_link7'
         else: #baxter right limb
-            self._robot = URDF.from_xml_string(open('baxter_base.urdf', 'r+').read())
+            cur_path = os.path.dirname(os.path.abspath(__file__))
+            self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'baxter_base.urdf'), 'r+').read())
             self._tip_link = 'right_wrist' 
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
@@ -97,6 +99,7 @@ class robot_kinematics(object):
         poses[:,:,num:] = pose
         angle = 0
         cur_pose = np.eye(4)
+        
         for idx in range(poses.shape[-1]):
             tip2tip = inv(cur_pose).dot(poses[:,:,idx])
             segment = self._arm_chain.getSegment(idx)
@@ -105,11 +108,15 @@ class robot_kinematics(object):
             for i in range(3):
                 for j in range(4):
                     pose_j2t[i,j] = joint2tip[i,j]    
+            
             pose_joint = inv(pose_j2t).dot(tip2tip)
             rotate_axis = segment.getJoint().JointAxis()
+            
             axis, angle = mat2axangle(pose_joint[:3,:3]) 
+
             joint_values.append(angle)
             cur_pose = poses[:,:,idx]
+        
         return rad2deg(np.array(joint_values[num:])) 
 
     def solve_poses_from_joint(self,joint_values=None,base_link='right_arm_mount'):
@@ -138,7 +145,10 @@ class robot_kinematics(object):
         """
         num = self._arm_chain.getNrOfSegments() - self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         joints_t = self.solve_joint_from_poses(pose, base_link)
-        joints_p = joints_t + scale*np.random.randn(num)
+        if np.random.randint(2, size=1) == 0:
+            joints_p = joints_t + scale * np.random.randn(num) 
+        else:
+            joints_p = joints_t - scale * np.random.randn(num) 
         while not self.check_joint_limits(joints_p,base_link):
             joints_p = joints_t + scale*np.random.randn(num)
         pose_p = self.solve_poses_from_joint(joints_p, base_link)
@@ -155,6 +165,16 @@ class robot_kinematics(object):
                 print "{} joint limits exceeded! angle: {}".format(joint_name, joint_values[idx])
                 return False
         return True
+
+    def gen_rand_pose(self, base_link='right_arm_mount'):
+        joint_values = []
+        num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        for idx in range(num, self._arm_chain.getNrOfSegments()):
+            joint_name = self._joint_name[idx]
+            ub = min(self._joint_limits[joint_name][1], 3.14) #joint 6 has limit = 3.8 which causes problem in solve inv
+            lb = max(self._joint_limits[joint_name][0], -3.14)
+            joint_values.append(np.random.uniform(lb, ub))
+        return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link)
 
 def to4x4(T): 
     new_T = np.eye(4)
@@ -219,7 +239,9 @@ def main():
         if args.robot == 'panda_arm':  #correspond with move_arm
             joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])        
         poses = robot.solve_poses_from_joint(joints,base_link) 
-        poses_p = robot.perturb_pose(poses,base_link)
+        # poses_p = robot.perturb_pose(poses,base_link)
+        poses_p = robot.gen_rand_pose(base_link)
+        poses_p = robot.perturb_pose(poses_p,base_link)
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
         poses = []
         for i in range(7):
