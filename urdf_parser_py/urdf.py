@@ -1,5 +1,5 @@
-from urdf_parser_py.xml_reflection.basics import *
-import urdf_parser_py.xml_reflection as xmlr
+from xml_reflection.basics import *
+import xml_reflection as xmlr
 
 # Add a 'namespace' for names to avoid a conflict between URDF and SDF?
 # A type registry? How to scope that? Just make a 'global' type pointer?
