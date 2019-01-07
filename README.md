@@ -1,30 +1,27 @@
 # robotPose
 ### Installation
-Install vtk, transforms3d
+Install vtk, transforms3d, lxml 
 ```Shell
 pip install vtk (conda install -c conda-forge vtk)
 pip install transforms3d
+pip install lxml
 ```
-Install urdf_parser_py from https://github.com/ros/urdf_parser_py
+urdf_parser_py is from https://github.com/ros/urdf_parser_py
+Install pykdl
 ```Shell
-cd $urdf_parser_py
-mkdir build
-cd build
-cmake ..
-make
-```
-install pykdl from https://github.com/orocos/orocos_kinematics_dynamics
-```Shell
+git clone https://github.com/orocos/orocos_kinematics_dynamics
 cd $orocos_kinematics_dynamics/orocos_kdl
 mkdir build
 cd build
 cmake ..
 make
+make install
 cd $orocos_kinematics_dynamics/python_rocos_kdl
 mkdir build
 cd build
 cmake ..
 make
+make install
 ```
 To generate a usable urdf seperate from ros, run (panda arm for instance):
 ```Shell

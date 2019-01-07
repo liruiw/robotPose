@@ -4,6 +4,7 @@ import numpy as np
 import PyKDL
 import scipy.io as sio
 from transforms3d.quaternions import quat2mat, mat2quat
+from transforms3d.euler import euler2mat, mat2euler, euler2quat
 from transforms3d.axangles import mat2axangle
 import os
 import numpy.random as random
@@ -145,13 +146,11 @@ class robot_kinematics(object):
         """
         num = self._arm_chain.getNrOfSegments() - self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         joints_t = self.solve_joint_from_poses(pose, base_link)
-        if np.random.randint(2, size=1) == 0:
-            joints_p = joints_t + scale * np.random.randn(num) 
-        else:
-            joints_p = joints_t - scale * np.random.randn(num) 
+        joints_p = joints_t + scale * np.random.randn(num) 
+        #joints_p = joints_t - scale # fix perturb
         while not self.check_joint_limits(joints_p,base_link):
             joints_p = joints_t + scale*np.random.randn(num)
-        pose_p = self.solve_poses_from_joint(joints_p, base_link)
+        pose_p = self.solve_poses_from_joint(joints_p, base_link) 
         return pose_p
 
     def check_joint_limits(self, joint_values, base_link='right_arm_mount'):
@@ -168,12 +167,14 @@ class robot_kinematics(object):
 
     def gen_rand_pose(self, base_link='right_arm_mount'):
         joint_values = []
+        margin = 0.1
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         for idx in range(num, self._arm_chain.getNrOfSegments()):
             joint_name = self._joint_name[idx]
-            ub = min(self._joint_limits[joint_name][1], 3.14) #joint 6 has limit = 3.8 which causes problem in solve inv
-            lb = max(self._joint_limits[joint_name][0], -3.14)
+            ub = min(self._joint_limits[joint_name][1] - margin, 3.14) #joint 6 has limit = 3.8 which causes problem in solve inv
+            lb = max(self._joint_limits[joint_name][0] + margin, -3.14)
             joint_values.append(np.random.uniform(lb, ub))
+            #joint_values[-1] = 0 # fix initial pose
         return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link)
 
 def to4x4(T): 
@@ -203,6 +204,7 @@ def main():
     renderer = YCBRenderer(width=width, height=height, render_marker=False)
     if args.robot == 'panda_arm':
         models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
+        #models = [ 'link4']
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
         colors = [
@@ -226,29 +228,47 @@ def main():
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(5):
-        file = sio.loadmat('sample_data/%06d-meta.mat'%index)
+    for index in range(50):
+        file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         #panda and baxter have dof 7, we are interested in 6
         pose_cam = file['poses']
-        arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
+        arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
         pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
-        for i in range(7):
-            pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
-            pose_r[:,:,i] = pose_i       
-        joints = robot.solve_joint_from_poses(pose_r,base_link)
         if args.robot == 'panda_arm':  #correspond with move_arm
-            joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])        
-        poses = robot.solve_poses_from_joint(joints,base_link) 
-        # poses_p = robot.perturb_pose(poses,base_link)
+            joints =  np.array([-21.44609135,-56.99551849,-34.10630934,-144.2176713,-28.41103454,96.58738471,4.39702329])
+            joints =  np.array([0,0,0,0,0,0,0])
+            initial_pt = np.array([0,0,1])     
+            r = np.zeros(3)  
+            r[0] = np.random.uniform(low=-np.pi/2, high=np.pi/2)
+            r[2] = np.random.uniform(low=-np.pi, high=np.pi)
+            rot = euler2mat(*r)
+            pos = np.matmul(rot, initial_pt)
+            pos = (pos / np.linalg.norm(pos)) * np.random.uniform(low=2.3, high=2.5)
+            pos = np.array([2.6, -1.8, 1.2])        
+            renderer.set_camera(pos, 2*pos, [0,0,-1])
+            renderer.set_light_pos(pos + np.random.uniform(-0.5, 0.5, 3))
+            intensity = np.random.uniform(0.8, 2)
+            light_color = intensity * np.random.uniform(0.9, 1.1, 3)
+            renderer.set_light_color(light_color)  
+        
+        #poses_p = robot.perturb_pose(poses_p,base_link)
+        else:
+            camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
+            for i in range(7):
+                pose_i = to4x4(pose_cam[:,:,i+1]) #inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
+                pose_r[:,:,i] = pose_i       
+            joints = robot.solve_joint_from_poses(pose_r,base_link)
+            renderer.V = camera_extrinsics
+        #poses_p = robot.solve_poses_from_joint(joints,base_link) 
         poses_p = robot.gen_rand_pose(base_link)
-        poses_p = robot.perturb_pose(poses_p,base_link)
-        arm_test_image = cv2.imread('sample_data/%06d-color.png'%index)
+        arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
         poses = []
         for i in range(7):
-            pose_i = camera_extrinsics.dot(poses_p[i])
+            pose_i = poses_p[i]
             rot = mat2quat(pose_i[:3,:3])
             trans = pose_i[:3,3]
             poses.append(np.hstack((trans,rot))) 
+            
         renderer.set_poses(poses)
         renderer.render(cls_indexes, image_tensor, seg_tensor)
         image_tensor = image_tensor.flip(0)
@@ -265,7 +285,6 @@ def main():
         arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
 
-camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
 camera_intrinsics=np.array([[525, 0, 319.5],[ 0, 525, 239.5],[0, 0, 1]])
 
 if __name__ == "__main__":
