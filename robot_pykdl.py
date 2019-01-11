@@ -123,28 +123,39 @@ class robot_kinematics(object):
             cur_pose = poses[:,:,idx]
         return rad2deg(np.array(joint_values[num:])) 
 
-    def solve_poses_from_joint(self, joint_values=None, base_link='right_arm_mount'):
+    def solve_poses_from_joint(self, joint_values=None, base_link='right_arm_mount', base_pose=None):
         """
         Input joint angles in degrees, output poses list in robot coordinates 
+        If a base pose is given, starts at that pose otherwise insert 0 degree joint pose at front
         """
         poses = []
+        pose_deltas = []
         if self.check_joint_limits(joint_values, base_link=base_link):
-            num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
-            joint_values = np.insert(joint_values,0,np.zeros(num)) # base to the interested joint
             joint_values = deg2rad(joint_values)
-            cur_pose = np.eye(4)
-            for idx in xrange(joint_values.shape[0]):
-                
-                pose_ = self._arm_chain.getSegment(idx).pose(joint_values[idx])
+            cur_pose = base_pose
+            base = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+            if base_pose is None: # asssume all zero angles
+                cur_pose = np.eye(4)
+                for idx in xrange(base):     
+                    pose_ = self._arm_chain.getSegment(idx).pose(0)
+                    pose_end = np.eye(4)
+                    for i in range(3):
+                        for j in range(4):
+                            pose_end[i,j] = pose_[i,j]
+                    cur_pose = cur_pose.dot(pose_end)                
+            for idx in xrange(joint_values.shape[0]):     
+                pose_ = self._arm_chain.getSegment(idx+base).pose(joint_values[idx])
                 pose_end = np.eye(4)
                 for i in range(3):
                     for j in range(4):
                         pose_end[i,j] = pose_[i,j]
                 cur_pose = cur_pose.dot(pose_end)
                 poses.append(cur_pose.copy())
-            return poses[num:]  #
+                pose_deltas.append(pose_end.copy())
 
-    def perturb_pose(self, pose, base_link='right_arm_mount', scale=5):
+            return poses
+
+    def perturb_pose(self, pose, base_link='right_arm_mount', scale=5, base_pose=None):
         """
         Perturb the initial pose based on joint angles
         """
@@ -154,8 +165,7 @@ class robot_kinematics(object):
         #joints_p = joints_t - scale # fix perturb
         while not self.check_joint_limits(joints_p,base_link):
             joints_p = joints_t + scale*np.random.randn(num)
-        pose_p = self.solve_poses_from_joint(joints_p, base_link) 
-        return pose_p
+        return self.solve_poses_from_joint(joints_p, base_link, base_pose), joints_p - joints_t
 
     def get_pose_delta(self, pose_delta, base_link='right_arm_mount'):
         """
@@ -204,8 +214,7 @@ class robot_kinematics(object):
             lb = max(self._joint_limits[joint_name][0] + margin, -3.14)
             joint_values.append(np.random.uniform(lb, ub))
             #joint_values[-1] = 0 # fix initial pose
-        #print rad2deg(np.array(joint_values))
-        return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link)
+        return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link), joint_values
 
 def to4x4(T): 
     new_T = np.eye(4)
@@ -222,6 +231,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
+    parser.add_argument('--test', type=str, default='all', help='Robot Name')
     args = parser.parse_args()
     robot = robot_kinematics(args.robot)
     width = 640 #800
@@ -234,30 +244,46 @@ def main():
     renderer = YCBRenderer(width=width, height=height, render_marker=False)
     if args.robot == 'panda_arm':
         models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
-        base_link = 'panda_link3'
+        base_link = 'panda_link0'
+        if args.test == 'middle':
+            base_link = 'panda_link3'
+        base_idx = 0
         if base_link[-5:] in models:
-            models = models[models.index(base_link[-5:])+1:]
-        #print models
+            base_idx = models.index(base_link[-5:])+1
+            models = models[base_idx:]
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
         colors = [
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
+        cls_indexes = range(7 - base_idx) #7
+    elif args.robot == 'baxter':
+        models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
+        base_idx = 0
+        base_link = 'right_arm_mount'
+        if args.test[:6] == 'middle':
+            base_link = 'right_upper_elbow'
+            base_idx = 3
+        models = models[base_idx:]
+        obj_paths = [
+            '{}_models/{}.DAE'.format(args.robot,item) for item in models]
+        colors = [
+            [0.1*(idx+1),0,0] for idx in range(len(models))]
+        texture_paths = ['' for item in models]
+        cls_indexes = range(7 - base_idx) #7
 
     renderer.load_objects(obj_paths, texture_paths, colors)
-    cls_indexes = range(3) #7
+    
     renderer.set_camera_default()
     renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
     renderer.set_light_pos([0, 0, 1])
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(30):
+    for index in range(5):
         file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         #panda and baxter have dof 7, we are interested in 6
-        pose_cam = file['poses']
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
-        pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
         if args.robot == 'panda_arm':  #correspond with move_arm
             initial_pt = np.array([0,0,1])     
             r = np.zeros(3)  
@@ -272,14 +298,28 @@ def main():
             intensity = np.random.uniform(0.8, 2)
             light_color = intensity * np.random.uniform(0.9, 1.1, 3)
             renderer.set_light_color(light_color)  
-        #joint = np.array([-24.2019667,  -29.78523618,  81.72659354, 122.63476349])
-        #test1 = robot.solve_poses_from_joint(joint, base_link)
-        #print joint  
-        #print robot.solve_joint_from_poses(test1, base_link) 
-        poses_p = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
+
+        else:
+            pose_cam = file['poses']
+            pose_r = np.zeros([4,4,7]) #assume the poses before arm has all 0 joint angles
+            camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
+            for i in range(7):
+                pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
+                pose_r[:,:,i] = pose_i       
+            
+            joints = robot.solve_joint_from_poses(pose_r, 'right_arm_mount')
+            renderer.V = camera_extrinsics
+            poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link)
+            if base_idx > 0:
+                poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link,base_pose=pose_r[:,:,base_idx-1])
+        if args.robot != 'baxter' or args.test[-3:] != 'fix':
+            poses_p, joint = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
+            joint_test = robot.solve_poses_from_joint(np.array(joint), base_link)
+            print 'joint test', joint  
+            print robot.solve_joint_from_poses(joint_test, base_link)         
+            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
+            print  'perturb test', perturb
         poses = []
-        # print robot.solve_joint_from_poses(poses_p, base_link)
-        poses_p = robot.perturb_pose(poses_p, base_link)
         for i in range(len(poses_p)):
             pose_i = poses_p[i]
             rot = mat2quat(pose_i[:3,:3])
