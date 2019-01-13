@@ -157,7 +157,7 @@ class robot_kinematics(object):
 
     def perturb_pose(self, pose, base_link='right_arm_mount', scale=5, base_pose=None):
         """
-        Perturb the initial pose based on joint angles
+        Perturb the initial pose based on joint angles and return the perturb joint angles
         """
         num = len(pose)
         joints_t = self.solve_joint_from_poses(pose, base_link)
@@ -165,7 +165,7 @@ class robot_kinematics(object):
         #joints_p = joints_t - scale # fix perturb
         while not self.check_joint_limits(joints_p,base_link):
             joints_p = joints_t + scale*np.random.randn(num)
-        return self.solve_poses_from_joint(joints_p, base_link, base_pose), joints_p - joints_t
+        return self.solve_poses_from_joint(joints_p, base_link, base_pose), joints_p
 
     def get_pose_delta(self, pose_delta, base_link='right_arm_mount'):
         """
@@ -204,7 +204,7 @@ class robot_kinematics(object):
                 return False
         return True
 
-    def gen_rand_pose(self, base_link='right_arm_mount'):
+    def gen_rand_pose(self, base_link='right_arm_mount', base_pose=None):
         joint_values = []
         margin = 0.1
         num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
@@ -214,7 +214,7 @@ class robot_kinematics(object):
             lb = max(self._joint_limits[joint_name][0] + margin, -3.14)
             joint_values.append(np.random.uniform(lb, ub))
             #joint_values[-1] = 0 # fix initial pose
-        return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link), joint_values
+        return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link, base_pose=base_pose), joint_values
 
 def to4x4(T): 
     new_T = np.eye(4)
