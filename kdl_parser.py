@@ -85,10 +85,10 @@ def main():
     args = parser.parse_args()
     robot = URDF.from_xml_string(args.file.read()) #urdf.Robot.from_xml_file(sys.argv[1])
     num_non_fixed_joints = 0
-    #print robot.joints
+    #print robot.links
     for joint in robot.joints:
         if joint.limit:
-            print'joint limit', joint.name, joint.limit.lower,joint.limit.upper
+            print'joint limit', joint.name, joint.limit.lower,joint.limit.upper, joint.parent, joint.child
         if joint.joint_type != 'fixed':
             num_non_fixed_joints += 1
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
