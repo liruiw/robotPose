@@ -14,14 +14,27 @@ from urdf_parser_py.urdf import URDF
 from ycb_renderer import YCBRenderer
 import torch
 
+def to4x4(T): 
+    new_T = np.eye(4)
+    new_T[:3,:4] = T
+    return new_T
+
 def mkdir_if_missing(dst_dir):
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
+
 def list2M(pose_list):
     poses = np.zeros([4,4,len(pose_list)])
     for idx, pose in enumerate(pose_list):
         poses[:,:,idx] = pose
     return poses
+
+def M2list(pose):
+    pose_list = []
+    for idx in range(pose.shape[-1]):
+        pose_list.append(pose[:,:,idx])
+    return pose_list
+
 def deg2rad(deg):
     return deg/180.0*np.pi
 
@@ -42,17 +55,20 @@ class robot_kinematics(object):
             cur_path = os.path.dirname(os.path.abspath(__file__))
             self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'baxter_base.urdf'), 'r+').read())
             self._tip_link = 'right_wrist' 
+        self._name = robot
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
          #we are not interested in gripper
         self._tip_frame = PyKDL.Frame()
         self._arm_chain = self._kdl_tree.getChain(self._base_link,
                                                   self._tip_link)
+        self.center_offset = self.load_offset()
         print self._base_link
         self._joint_name, self._joint_limits, self._joint2tips, self._pose_0 = self.get_joint_info()
-        print  self._joint_name,self._joint_limits
+        print self._joint_name,self._joint_limits
+
         # KDL Solvers not used for now
-    
+        
     def print_robot_description(self):
         nf_joints = 0
         for j in self._robot.joints:
@@ -217,24 +233,47 @@ class robot_kinematics(object):
             joint_values.append(np.random.uniform(lb, ub))
             #joint_values[-1] = 0 # fix initial pose
         return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link, base_pose=base_pose), joint_values
-
-def to4x4(T): 
-    new_T = np.eye(4)
-    new_T[:3,:4] = T
-    return new_T
     
-def r2c(T_list):
-    res = []
-    for T in T_list:
-        res.append((camera_extrinsics.dot(T))[:3,:])
-    return res
+    def load_offset(self):
+
+        cur_path = os.path.abspath(os.path.dirname(__file__))
+        offset_file = os.path.join(cur_path, self._name + '_models', 'center_offset.txt')
+        offset = np.loadtxt(offset_file).astype(np.float32)
+        offset_list = []
+        for i in range(offset.shape[0]):
+            offset_pose = np.eye(4)
+            offset_pose[:3, 3] = offset[i, :]
+            offset_list.append(offset_pose)
+
+        #extent max - min in mesh, center = (max + min)/2
+        return offset_list
+        
+    def offset_pose_center(self, pose, dir='off', base_link='right_arm_mount'): 
+        """
+        Off means removing the offset from the translation, on means adding the offset.
+        """ 
+        base_idx = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        input_list = False      
+        if type(pose) == list:
+            input_list = True
+            pose = list2M(pose)
+        for i in range(pose.shape[-1]):
+            if dir == 'on':
+                self.center_offset[base_idx+i][:3, 3] *= -1  # the inverse
+            pose[:, :, i] = pose[:, :, i].dot(self.center_offset[base_idx+i])
+        if input_list:
+            return M2list(pose)
+        return pose
+    
+    def _get_link_name(self, base_l):
+        return path.strip().split('_')[-1]
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
     parser.add_argument('--test', type=str, default='all', help='Robot Name')
-    args = parser.parse_args()
+    args = parser.parse_args()          
     robot = robot_kinematics(args.robot)
     width = 640 #800
     height = 480 #600
@@ -250,8 +289,9 @@ def main():
         if args.test == 'middle':
             base_link = 'panda_link3'
         base_idx = 0
-        if base_link[-5:] in models:
-            base_idx = models.index(base_link[-5:])+1
+        name = base_link.strip().split('_')[-1]
+        if name in models:
+            base_idx = models.index(name) + 1 #take the link name
             models = models[base_idx:]
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
@@ -275,14 +315,13 @@ def main():
         cls_indexes = range(7 - base_idx) #7
 
     renderer.load_objects(obj_paths, texture_paths, colors)
-    
     renderer.set_camera_default()
     renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
     renderer.set_light_pos([0, 0, 1])
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(5):
+    for index in range(10):
         file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         #panda and baxter have dof 7, we are interested in 6
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
@@ -307,25 +346,39 @@ def main():
             camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
             for i in range(7):
                 pose_i = inv(camera_extrinsics).dot(to4x4(pose_cam[:,:,i+1])) #cam to r
-                pose_r[:,:,i] = pose_i       
-            
+                pose_r[:,:,i] = pose_i  
+        
             joints = robot.solve_joint_from_poses(pose_r, 'right_arm_mount')
             renderer.V = camera_extrinsics
             poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link)
+            
             if base_idx > 0:
-                print 'base pose test'
+                print 'base pose test ==================='
                 print joints[base_idx:]
                 poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link,base_pose=pose_r[:,:,base_idx-1])
                 joints_p = robot.solve_joint_from_poses(poses_p,base_link,base_pose=pose_r[:,:,base_idx-1])
-                print joints_p
-        if args.robot != 'baxter' or args.test[-3:] != 'fix':
+                
+                print '======================'
+        
+        if args.robot != 'baxter':
             poses_p, joint = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
             joint_test = robot.solve_poses_from_joint(np.array(joint), base_link, base_pose=np.eye(4))
-            print 'joint test', joint  
-            print robot.solve_joint_from_poses(joint_test, base_link, base_pose=np.eye(4))         
+            print 'joint test ==================='
+            print joint 
+            print robot.solve_joint_from_poses(joint_test, base_link, base_pose=np.eye(4))
+            print '======================'
+
+            print 'mesh center test ==================='
+            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) #original -> center pose
+            poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)  #center -> original pose
+                     
             poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
-            print  'perturb test', perturb
+            print 'perturb test ==================='
+            print perturb
+            print '======================'
+        
         poses = []
+        #poses_p = robot.offset_pose_center(poses_p, dir='off', base_idx=base_idx)
         for i in range(len(poses_p)):
             pose_i = poses_p[i]
             rot = mat2quat(pose_i[:3,:3])

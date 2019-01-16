@@ -1,0 +1,9 @@
+ycb_render/robotPose/panda_arm_models/link1.DAE
+ycb_render/robotPose/panda_arm_models/link2.DAE
+ycb_render/robotPose/panda_arm_models/link3.DAE
+ycb_render/robotPose/panda_arm_models/link4.DAE
+ycb_render/robotPose/panda_arm_models/link5.DAE
+ycb_render/robotPose/panda_arm_models/link6.DAE
+ycb_render/robotPose/panda_arm_models/link7.DAE
+ycb_render/robotPose/panda_arm_models/finger.DAE
+ycb_render/robotPose/panda_arm_models/hand.DAE

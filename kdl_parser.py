@@ -91,6 +91,8 @@ def main():
             print'joint limit', joint.name, joint.limit.lower,joint.limit.upper, joint.parent, joint.child
         if joint.joint_type != 'fixed':
             num_non_fixed_joints += 1
+        else:
+            print 'fix joint', joint.name 
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
     tree = kdl_tree_from_urdf_model(robot)
     print "KDL joints: %d" % tree.getNrOfJoints()

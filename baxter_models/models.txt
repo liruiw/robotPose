@@ -1,0 +1,9 @@
+ycb_render/robotPose/baxter_models/dummy1.DAE
+ycb_render/robotPose/baxter_models/dummy2.DAE
+ycb_render/robotPose/baxter_models/S0.DAE
+ycb_render/robotPose/baxter_models/S1.DAE
+ycb_render/robotPose/baxter_models/E0.DAE
+ycb_render/robotPose/baxter_models/E1.DAE
+ycb_render/robotPose/baxter_models/W0.DAE
+ycb_render/robotPose/baxter_models/W1.DAE
+ycb_render/robotPose/baxter_models/W2.DAE
