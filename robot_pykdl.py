@@ -7,12 +7,14 @@ from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.euler import euler2mat, mat2euler, euler2quat
 from transforms3d.axangles import mat2axangle
 import os
+import sys
 import numpy.random as random
 from numpy.linalg import inv
 from kdl_parser import kdl_tree_from_urdf_model
 from urdf_parser_py.urdf import URDF
 from ycb_renderer import YCBRenderer
 import torch
+np.random.seed(233)
 
 def to4x4(T): 
     new_T = np.eye(4)
@@ -167,17 +169,22 @@ class robot_kinematics(object):
 
             return poses
 
-    def perturb_pose(self, pose, base_link='right_arm_mount', scale=5, base_pose=None):
+    def perturb_pose(self, pose, base_link='right_arm_mount', scale=5, base_pose=None, center_offset=False):
         """
         Perturb the initial pose based on joint angles and return the perturb joint angles
         """
+        if center_offset:
+            pose = self.offset_pose_center(pose, dir='on', base_link=base_link)
         num = len(pose)
         joints_t = self.solve_joint_from_poses(pose, base_link, base_pose)
         joints_p = joints_t + scale * np.random.randn(num) 
         #joints_p = joints_t - scale # fix perturb
-        while not self.check_joint_limits(joints_p,base_link):
+        while not self.check_joint_limits(joints_p, base_link):
             joints_p = joints_t + scale*np.random.randn(num)
-        return self.solve_poses_from_joint(joints_p, base_link, base_pose), joints_p
+        pose = self.solve_poses_from_joint(joints_p, base_link, base_pose)
+        if center_offset:
+            pose = self.offset_pose_center(pose, dir='off', base_link=base_link)        
+        return pose, joints_p
 
     def get_pose_delta(self, pose_delta, base_link='right_arm_mount'):
         """
@@ -235,7 +242,7 @@ class robot_kinematics(object):
         return self.solve_poses_from_joint(rad2deg(np.array(joint_values)),base_link, base_pose=base_pose), joint_values
     
     def load_offset(self):
-
+        # load the offset from the presaved txt file
         cur_path = os.path.abspath(os.path.dirname(__file__))
         offset_file = os.path.join(cur_path, self._name + '_models', 'center_offset.txt')
         offset = np.loadtxt(offset_file).astype(np.float32)
@@ -244,23 +251,23 @@ class robot_kinematics(object):
             offset_pose = np.eye(4)
             offset_pose[:3, 3] = offset[i, :]
             offset_list.append(offset_pose)
-
-        #extent max - min in mesh, center = (max + min)/2
+        #extent = max - min, center = (max + min)/2 (3D bounding box)
         return offset_list
         
     def offset_pose_center(self, pose, dir='off', base_link='right_arm_mount'): 
         """
-        Off means removing the offset from the translation, on means adding the offset.
+        Off means removing the offset.
         """ 
         base_idx = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
-        input_list = False      
+        input_list = False  
         if type(pose) == list:
             input_list = True
             pose = list2M(pose)
         for i in range(pose.shape[-1]):
-            if dir == 'on':
-                self.center_offset[base_idx+i][:3, 3] *= -1  # the inverse
-            pose[:, :, i] = pose[:, :, i].dot(self.center_offset[base_idx+i])
+            offset_pose = self.center_offset[base_idx + i].copy()
+            if dir == 'on':     
+                offset_pose[:3, 3] *= -1 
+            pose[:, :, i] = pose[:, :, i].dot(offset_pose)
         if input_list:
             return M2list(pose)
         return pose
@@ -282,7 +289,7 @@ def main():
     import cv2
     mkdir_if_missing('test_image')
     print 'robot name', args.robot
-    renderer = YCBRenderer(width=width, height=height, render_marker=False)
+    renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
     if args.robot == 'panda_arm':
         models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7']
         base_link = 'panda_link0'
@@ -353,13 +360,11 @@ def main():
             poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link)
             
             if base_idx > 0:
-                print 'base pose test ==================='
-                print joints[base_idx:]
+                print 'middle base test ==================='
                 poses_p = robot.solve_poses_from_joint(joints[base_idx:],base_link,base_pose=pose_r[:,:,base_idx-1])
-                joints_p = robot.solve_joint_from_poses(poses_p,base_link,base_pose=pose_r[:,:,base_idx-1])
-                
+                joints_p = robot.solve_joint_from_poses(poses_p,base_link,base_pose=pose_r[:,:,base_idx-1])   
                 print '======================'
-        
+            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) #original -> center pose
         if args.robot != 'baxter':
             poses_p, joint = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
             joint_test = robot.solve_poses_from_joint(np.array(joint), base_link, base_pose=np.eye(4))
@@ -369,11 +374,22 @@ def main():
             print '======================'
 
             print 'mesh center test ==================='
-            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) #original -> center pose
+            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) 
             poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)  #center -> original pose
-                     
-            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
+            print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
+            poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link) 
+            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)  #center -> original pose
+            print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
+
             print 'perturb test ==================='
+            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
+            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
+            # poses = np.load('test.npy')
+            # poses_p = []
+            # for i in range(len(poses)): #weird numpy saving
+            #     poses_p.append(poses[i])
+
+            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4), center_offset=True)
             print perturb
             print '======================'
         
@@ -383,10 +399,11 @@ def main():
             pose_i = poses_p[i]
             rot = mat2quat(pose_i[:3,:3])
             trans = pose_i[:3,3]
+            print np.hstack((trans,rot))
             poses.append(np.hstack((trans,rot))) 
         #rendering test
         renderer.set_poses(poses)
-        renderer.render(cls_indexes, image_tensor, seg_tensor)
+        renderer.render(range(len(poses_p)), image_tensor, seg_tensor)
         image_tensor = image_tensor.flip(0)
         seg_tensor = seg_tensor.flip(0)
 
