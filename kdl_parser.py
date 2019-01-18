@@ -88,11 +88,13 @@ def main():
     #print robot.links
     for joint in robot.joints:
         if joint.limit:
-            print'joint limit', joint.name, joint.limit.lower,joint.limit.upper, joint.parent, joint.child
+            print'joint name: {}, limit: ({}, {}), parent :{}, child: {}'.format(\
+                joint.name, joint.limit.lower,joint.limit.upper, joint.parent, joint.child)
         if joint.joint_type != 'fixed':
             num_non_fixed_joints += 1
         else:
-            print 'fix joint', joint.name 
+            print'fixed joint name: {}, parent :{}, child: {}'.format(\
+                joint.name, joint.parent, joint.child)
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
     tree = kdl_tree_from_urdf_model(robot)
     print "KDL joints: %d" % tree.getNrOfJoints()
@@ -101,6 +103,15 @@ def main():
     base_link = robot.get_root()
     end_link = robot.link_map.keys()[len(robot.links)-1]
     chain = tree.getChain(base_link, end_link)
+    # print tree.getNrOfSegments(), robot.link_map.keys()
+    if args.file.name.split('_')[0] == 'panda':
+        chain = tree.getChain(base_link, 'panda_rightfinger')
+    for idx in xrange(chain.getNrOfSegments()):
+        segment = chain.getSegment(idx)
+        print segment.getJoint().getName() #, 'initial pose: '
+        print segment.getFrameToTip()
+        print segment.getJoint().JointAxis()
+        #print segment.pose(0) #fix joint won't change with joint angle 
     print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()
