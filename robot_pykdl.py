@@ -275,7 +275,7 @@ class robot_kinematics(object):
         
     def offset_pose_center(self, pose, dir='off', base_link='right_arm_mount'): 
         """
-        Off means removing the offset.
+        Off means from original pose to the centered pose.
         """ 
         base_idx = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         input_list = False  
@@ -310,7 +310,7 @@ def main():
     print 'robot name', args.robot
     renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
     if args.robot == 'panda_arm':
-        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger']
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger']
         base_link = 'panda_link0'
         if args.test == 'middle':
             base_link = 'panda_link3'
@@ -325,7 +325,7 @@ def main():
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
         cls_indexes = range(len(models)) #7
-        cls_indexes += [cls_indexes[-1]]
+        #cls_indexes += [cls_indexes[-1]]
     elif args.robot == 'baxter':
         models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
         base_idx = 0
