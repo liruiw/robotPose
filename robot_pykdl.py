@@ -65,7 +65,7 @@ class robot_kinematics(object):
             cur_path = os.path.dirname(os.path.abspath(__file__))
             self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'baxter_base.urdf'), 'r+').read())
             self._tip_link = 'right_wrist' 
-            self._end_effector = ['']
+            self._end_effector = []
         self._name = robot
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
@@ -138,8 +138,6 @@ class robot_kinematics(object):
         for joint in robot_description.joints:
             if joint.name in joints and joint.limit:
                 joint_limits[joint.name] = [joint.limit.lower,joint.limit.upper]
-                # else:
-                #     self._fix_joint_ids.append(joints.index(joint.name) + 1)
         return joints, joint_limits, segment_joint2tip, initial_pose
 
     def solve_joint_from_poses(self, pose, base_link='right_arm_mount', base_pose=None): 
@@ -165,7 +163,7 @@ class robot_kinematics(object):
             axis, angle = mat2axangle(pose_joint[:3,:3]) 
             joint_values.append(angle)
             cur_pose = pose[:, :, idx]
-            if idx + base == 8: #right finger reuse hand pose
+            if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
                 cur_pose = pose[:,:,-3].copy()
         return rad2deg(np.array(joint_values)) 
 
@@ -187,10 +185,10 @@ class robot_kinematics(object):
 
             for idx in xrange(joint_values.shape[0]): 
                 cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
-                if idx + base == 7: # fixed combined joint 8 and hand joint
+                if idx + base == 7 and len(self._end_effector) > 0: # fixed combined joint 8 and hand joint
                     cur_pose = poses[-1].dot(self._joint2tips[idx + base])
                 poses.append(cur_pose.copy())
-                if idx + base == 8: #right finger reuse hand pose
+                if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
                     cur_pose = poses[-2].copy()
             return poses
         print 'invalid joint to solve poses'
@@ -203,10 +201,13 @@ class robot_kinematics(object):
             pose = self.offset_pose_center(pose, dir='on', base_link=base_link)
         num = len(pose)
         base = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+
         joints_t = self.solve_joint_from_poses(pose, base_link, base_pose)
+        
         joints_p = joints_t + scale * np.random.randn(num) 
         joints_p =  self.sample_ef(joints_p, base+num)
         while not self.check_joint_limits(joints_p, base_link):
+            return 
             joints_p = joints_t + scale*np.random.randn(num)
             joints_p = self.sample_ef(joints_p, base+num) 
         pose = self.solve_poses_from_joint(joints_p, base_link, base_pose)
@@ -248,8 +249,8 @@ class robot_kinematics(object):
         for idx in range(num, len(self._links)):
             joint_name = self._joint_name[idx]
             if joint_name in self._joint_limits:
-                ub = min(self._joint_limits[joint_name][1] - margin, 3.14) #joint 6 has limit = 3.8 which causes problem in solve inv
-                lb = max(self._joint_limits[joint_name][0] + margin, -3.14)
+                ub = min(self._joint_limits[joint_name][1] - margin, 3.) #joint 6 has limit = 3.8 which causes problem in solve inv
+                lb = max(self._joint_limits[joint_name][0] + margin, -3.)
                 joint_values.append(np.random.uniform(lb, ub))
             else: # fix joint
                 joint_values.append(0)
@@ -318,14 +319,12 @@ def main():
         name = base_link.strip().split('_')[-1]
         if name in models:
             base_idx = models.index(name) + 1 #take the link name
-            models = models[base_idx:]
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
         colors = [
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
-        cls_indexes = range(len(models)) #7
-        #cls_indexes += [cls_indexes[-1]]
+        cls_indexes = range(base_idx, len(models)) #7
     elif args.robot == 'baxter':
         models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
         base_idx = 0
@@ -333,13 +332,13 @@ def main():
         if args.test[:6] == 'middle':
             base_link = 'right_upper_elbow'
             base_idx = 3
-        models = models[base_idx:]
+        #models = models[base_idx:]
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
         colors = [
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
-        cls_indexes = range(len(models) - base_idx) #7
+        cls_indexes = range(base_idx, len(models)) #7
 
     renderer.load_objects(obj_paths, texture_paths, colors)
     renderer.set_camera_default()
@@ -384,17 +383,17 @@ def main():
                 joints_p = robot.solve_joint_from_poses(poses_p, base_link,base_pose=pose_r[:,:,base_idx-1])   
                 print '======================'
             poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) #original -> center pose
+        
         if args.robot != 'baxter':
 
             poses_p, joint = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
-            print 'joints', np.array(joint)
             joint_test = robot.solve_poses_from_joint(np.array(joint), base_link, base_pose=np.eye(4))
             print 'joint test ==================='
             print joint
             print robot.solve_joint_from_poses(joint_test, base_link, base_pose=np.eye(4))
             print '======================'
 
-            print 'mesh center test ==================='
+            # print 'mesh center test ==================='
             poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) 
             poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)  #center -> original pose
             print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
@@ -406,14 +405,10 @@ def main():
             print 'perturb test ==================='
             poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
             poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
-            # poses = np.load('test.npy')
-            # poses_p = []
-            # for i in range(len(poses)): #weird numpy saving
-            #     poses_p.append(poses[i])
             poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
             poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4), center_offset=True)
-            #poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
-            print perturb
+            # #poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
+            # print perturb
             print '======================'         
         poses = []
         for i in range(len(poses_p)):
@@ -421,7 +416,7 @@ def main():
             rot = mat2quat(pose_i[:3,:3])
             trans = pose_i[:3,3]
             poses.append(np.hstack((trans,rot))) 
-        #rendering test+'
+        #rendering test
         renderer.set_poses(poses)
         renderer.render(cls_indexes, image_tensor, seg_tensor)
         image_tensor = image_tensor.flip(0)
