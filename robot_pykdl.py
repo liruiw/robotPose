@@ -15,7 +15,26 @@ from urdf_parser_py.urdf import URDF
 from ycb_renderer import YCBRenderer
 import torch
 np.random.seed(233)
+def rotZ(rotz):
+    RotZ = np.matrix([[np.cos(rotz), -np.sin(rotz), 0, 0], 
+                  [np.sin(rotz), np.cos(rotz), 0, 0], 
+                  [0, 0, 1, 0], 
+                  [0, 0, 0, 1]])
+    return RotZ
 
+def rotX(rotx):
+    RotX = np.matrix([[1, 0, 0, 0], 
+                      [0, np.cos(rotx), -np.sin(rotx), 0], 
+                      [0, np.sin(rotx), np.cos(rotx), 0], 
+                      [0, 0, 0, 1]])
+    return RotX
+
+def rotY(roty):
+    RotY = np.matrix([[np.cos(roty), 0, np.sin(roty), 0], 
+                      [0, 1, 0, 0], 
+                      [-np.sin(roty), 0, np.cos(roty) , 0], 
+                      [0, 0, 0, 1]])
+    return RotY
 def to4x4(T): 
     new_T = np.eye(4)
     new_T[:3,:4] = T
@@ -276,7 +295,7 @@ class robot_kinematics(object):
         
     def offset_pose_center(self, pose, dir='off', base_link='right_arm_mount'): 
         """
-        Off means from original pose to the centered pose.
+        Off means from original pose to the centered pose in model coordinate.
         """ 
         base_idx = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
         input_list = False  
@@ -287,7 +306,10 @@ class robot_kinematics(object):
             offset_pose = self.center_offset[base_idx + i].copy()
             if dir == 'on':     
                 offset_pose[:3, 3] *= -1 
+            if base_idx + i == 9: # right finger has origin flipped in urdf :(
+                offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
             pose[:, :, i] = pose[:, :, i].dot(offset_pose)
+        
         if input_list:
             return M2list(pose)
         return pose
@@ -358,7 +380,7 @@ def main():
             rot = euler2mat(*r)
             pos = np.matmul(rot, initial_pt)
             pos = (pos / np.linalg.norm(pos)) * np.random.uniform(low=2.3, high=2.5)
-            pos = np.array([2.6, -1.8, 1.2])        
+            pos = np.array([0.6, -1.8, 1.2])        
             renderer.set_camera(pos, 2*pos, [0,0,-1])
             renderer.set_light_pos(pos + np.random.uniform(-0.5, 0.5, 3))
             intensity = np.random.uniform(0.8, 2)

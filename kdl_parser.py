@@ -106,12 +106,16 @@ def main():
     # print tree.getNrOfSegments(), robot.link_map.keys()
     if args.file.name.split('_')[0] == 'panda':
         chain = tree.getChain(base_link, 'panda_rightfinger')
-    for idx in xrange(chain.getNrOfSegments()):
+    for idx in xrange(chain.getNrOfSegments() - 1):
         segment = chain.getSegment(idx)
+        
         print segment.getJoint().getName() #, 'initial pose: '
         print segment.getFrameToTip()
         print segment.getJoint().JointAxis()
         #print segment.pose(0) #fix joint won't change with joint angle 
+    print 'left right finger'
+    print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.3)
+    print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.3)
     print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()
