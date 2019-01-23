@@ -22,19 +22,6 @@ def rotZ(rotz):
                   [0, 0, 0, 1]])
     return RotZ
 
-def rotX(rotx):
-    RotX = np.matrix([[1, 0, 0, 0], 
-                      [0, np.cos(rotx), -np.sin(rotx), 0], 
-                      [0, np.sin(rotx), np.cos(rotx), 0], 
-                      [0, 0, 0, 1]])
-    return RotX
-
-def rotY(roty):
-    RotY = np.matrix([[np.cos(roty), 0, np.sin(roty), 0], 
-                      [0, 1, 0, 0], 
-                      [-np.sin(roty), 0, np.cos(roty) , 0], 
-                      [0, 0, 0, 1]])
-    return RotY
 def to4x4(T): 
     new_T = np.eye(4)
     new_T[:3,:4] = T
@@ -98,7 +85,7 @@ class robot_kinematics(object):
         self._joint_name, self._joint_limits, self._joint2tips, self._pose_0 = self.get_joint_info()
         self.prepare_virtual_links()
         
-        print self._base_link
+        print 'robot name {} with base link {}'.format(self._name, self._base_link)
         print self._joint_name, self._joint_limits
         # KDL Solvers not used for now
         
@@ -172,9 +159,10 @@ class robot_kinematics(object):
         if base_pose is None: # asssume all zero angles
             cur_pose = np.eye(4) 
             for k in range(base):
-                cur_pose = cur_pose.dot(self._pose_0[k])   
+                cur_pose = cur_pose.dot(self._pose_0[k])
+
         for idx in range(pose.shape[-1]):
-            tip2tip = inv(cur_pose).dot(pose[:,:,idx])
+            tip2tip = inv(cur_pose).dot(pose[:,:,idx]) 
             segment = self._links[idx + base]
             pose_j2t = self._joint2tips[idx + base]           
             pose_joint = inv(pose_j2t).dot(tip2tip)
@@ -205,7 +193,10 @@ class robot_kinematics(object):
             for idx in xrange(joint_values.shape[0]): 
                 cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
                 if idx + base == 7 and len(self._end_effector) > 0: # fixed combined joint 8 and hand joint
-                    cur_pose = poses[-1].dot(self._joint2tips[idx + base])
+                    if base == 7:
+                        cur_pose = base_pose.dot(self._joint2tips[idx + base]) #fix pose anyways
+                    else:
+                        cur_pose = poses[-1].dot(self._joint2tips[idx + base])
                 poses.append(cur_pose.copy())
                 if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
                     cur_pose = poses[-2].copy()
@@ -222,17 +213,14 @@ class robot_kinematics(object):
         base = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
 
         joints_t = self.solve_joint_from_poses(pose, base_link, base_pose)
-        
         joints_p = joints_t + scale * np.random.randn(num) 
         joints_p =  self.sample_ef(joints_p, base+num)
         while not self.check_joint_limits(joints_p, base_link):
-            return 
             joints_p = joints_t + scale*np.random.randn(num)
-            joints_p = self.sample_ef(joints_p, base+num) 
+            joints_p = self.sample_ef(joints_p, base+num)
         pose = self.solve_poses_from_joint(joints_p, base_link, base_pose)
         if center_offset:
             pose = self.offset_pose_center(pose, dir='off', base_link=base_link)  
-   
         return pose, joints_p
 
     def sample_ef(self, joints, size):
@@ -314,9 +302,11 @@ class robot_kinematics(object):
             return M2list(pose)
         return pose
     
-    def _get_link_name(self, base_l):
-        return path.strip().split('_')[-1]
-
+    def get_link_name(self, name=None, link_id=None):
+        if name:
+            return name.strip().split('_')[-1]
+        elif link_id:
+            return self._arm_chain.getSegment(link_id).getName()
 def main():
     import argparse
     parser = argparse.ArgumentParser()

@@ -108,7 +108,7 @@ def main():
         chain = tree.getChain(base_link, 'panda_rightfinger')
     for idx in xrange(chain.getNrOfSegments() - 1):
         segment = chain.getSegment(idx)
-        
+        print segment.getName()
         print segment.getJoint().getName() #, 'initial pose: '
         print segment.getFrameToTip()
         print segment.getJoint().JointAxis()
