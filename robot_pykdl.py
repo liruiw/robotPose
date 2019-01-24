@@ -163,7 +163,6 @@ class robot_kinematics(object):
 
         for idx in range(pose.shape[-1]):
             tip2tip = inv(cur_pose).dot(pose[:,:,idx]) 
-            segment = self._links[idx + base]
             pose_j2t = self._joint2tips[idx + base]           
             pose_joint = inv(pose_j2t).dot(tip2tip)
             #rotate_axis = segment.getJoint().JointAxis()
@@ -193,8 +192,8 @@ class robot_kinematics(object):
             for idx in xrange(joint_values.shape[0]): 
                 cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
                 if idx + base == 7 and len(self._end_effector) > 0: # fixed combined joint 8 and hand joint
-                    if base == 7:
-                        cur_pose = base_pose.dot(self._joint2tips[idx + base]) #fix pose anyways
+                    if base_pose is not None and base == 7:
+                        cur_pose = base_pose.dot(self._joint2tips[idx + base])
                     else:
                         cur_pose = poses[-1].dot(self._joint2tips[idx + base])
                 poses.append(cur_pose.copy())
@@ -214,13 +213,14 @@ class robot_kinematics(object):
 
         joints_t = self.solve_joint_from_poses(pose, base_link, base_pose)
         joints_p = joints_t + scale * np.random.randn(num) 
-        joints_p =  self.sample_ef(joints_p, base+num)
+        joints_p = self.sample_ef(joints_p, base+num)
         while not self.check_joint_limits(joints_p, base_link):
             joints_p = joints_t + scale*np.random.randn(num)
             joints_p = self.sample_ef(joints_p, base+num)
         pose = self.solve_poses_from_joint(joints_p, base_link, base_pose)
         if center_offset:
             pose = self.offset_pose_center(pose, dir='off', base_link=base_link)  
+   
         return pose, joints_p
 
     def sample_ef(self, joints, size):
