@@ -306,6 +306,8 @@ class robot_kinematics(object):
         if name:
             return name.strip().split('_')[-1]
         elif link_id:
+            if link_id == -1:
+                return self._base_link.split('_')[-1]
             return self._arm_chain.getSegment(link_id).getName()
 def main():
     import argparse
