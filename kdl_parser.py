@@ -114,8 +114,8 @@ def main():
         print segment.getJoint().JointAxis()
         #print segment.pose(0) #fix joint won't change with joint angle 
     print 'left right finger'
-    print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.3)
-    print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.3)
+    print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
+    print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
     print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()

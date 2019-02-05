@@ -15,6 +15,7 @@ from urdf_parser_py.urdf import URDF
 from ycb_renderer import YCBRenderer
 import torch
 np.random.seed(233)
+
 def rotZ(rotz):
     RotZ = np.matrix([[np.cos(rotz), -np.sin(rotz), 0, 0], 
                   [np.sin(rotz), np.cos(rotz), 0, 0], 
@@ -73,6 +74,7 @@ class robot_kinematics(object):
             self._tip_link = 'right_wrist' 
             self._end_effector = []
         self._name = robot
+
         self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
         self._base_link = self._robot.get_root() #set it to base
          #we are not interested in gripper
@@ -152,7 +154,7 @@ class robot_kinematics(object):
         Joints before base link assumes to have joint angle 0, or a base pose can be provided
         """
         joint_values = [] 
-        base = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        base =  self._get_base_idx_shifted(base_link)
         if type(pose) == list:
             pose = list2M(pose)
         cur_pose = base_pose  
@@ -182,7 +184,8 @@ class robot_kinematics(object):
         if self.check_joint_limits(joint_values, base_link=base_link):
             joint_values = deg2rad(joint_values)
             cur_pose = base_pose
-            base = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+            base = self._get_base_idx_shifted(base_link)
+
             if base_pose is None: # asssume all zero angles
                 cur_pose = np.eye(4)
                 for idx in xrange(base):     
@@ -198,7 +201,10 @@ class robot_kinematics(object):
                         cur_pose = poses[-1].dot(self._joint2tips[idx + base])
                 poses.append(cur_pose.copy())
                 if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
-                    cur_pose = poses[-2].copy()
+                    if base_pose is not None and base == 8:
+                        cur_pose = base_pose.copy()
+                    else:
+                        cur_pose = poses[-2].copy()
             return poses
         print 'invalid joint to solve poses'
 
@@ -220,21 +226,20 @@ class robot_kinematics(object):
         pose = self.solve_poses_from_joint(joints_p, base_link, base_pose)
         if center_offset:
             pose = self.offset_pose_center(pose, dir='off', base_link=base_link)  
-   
         return pose, joints_p
 
     def sample_ef(self, joints, size):
         # perturb prismatic joint for panda
         if size == len(self._links) and len(self._end_effector) > 0:
-            joints[-1] = np.random.uniform(0, 2.29); 
-            joints[-2] = np.random.uniform(0, 2.29);  #0.04*180/pi
+            joints[-1] = 0 #np.random.uniform(0, 2.29); 
+            joints[-2] = 0 #np.random.uniform(0, 2.29);  #0.04*180/pi
         return joints          
     
     def check_joint_limits(self, joint_values, base_link='right_arm_mount'):
         """
         Check the joint limits based on urdf
         """
-        num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        num = self._get_base_idx_shifted(base_link)
         joint_values = deg2rad(joint_values)
         for idx in range(joint_values.shape[0]):  
             joint_name = self._joint_name[num + idx]
@@ -252,7 +257,7 @@ class robot_kinematics(object):
         """
         joint_values = []
         margin = 0.1 # 0.1 
-        num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        num = self._get_base_idx_shifted(base_link)
         for idx in range(num, len(self._links)):
             joint_name = self._joint_name[idx]
             if joint_name in self._joint_limits:
@@ -285,7 +290,7 @@ class robot_kinematics(object):
         """
         Off means from original pose to the centered pose in model coordinate.
         """ 
-        base_idx = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        base_idx = self._get_base_idx_shifted(base_link)
         input_list = False  
         if type(pose) == list:
             input_list = True
@@ -296,6 +301,7 @@ class robot_kinematics(object):
                 offset_pose[:3, 3] *= -1 
             if base_idx + i == 9: # right finger has origin flipped in urdf :(
                 offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
+                offset_pose[1, 3] -= 0.026
             pose[:, :, i] = pose[:, :, i].dot(offset_pose)
         
         if input_list:
@@ -309,12 +315,20 @@ class robot_kinematics(object):
             if link_id == -1:
                 return self._base_link.split('_')[-1]
             return self._arm_chain.getSegment(link_id).getName()
+
+    def _get_base_idx_shifted(self, base_link):
+        num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
+        if num > 7:
+            num -= 1 #account for the replaced link
+        return num
 def main():
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
     parser.add_argument('--test', type=str, default='all', help='Robot Name')
-    args = parser.parse_args()          
+    args = parser.parse_args()
+              
     robot = robot_kinematics(args.robot)
     width = 640 #800
     height = 480 #600
