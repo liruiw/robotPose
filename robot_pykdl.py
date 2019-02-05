@@ -194,17 +194,18 @@ class robot_kinematics(object):
 
             for idx in xrange(joint_values.shape[0]): 
                 cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
-                if idx + base == 7 and len(self._end_effector) > 0: # fixed combined joint 8 and hand joint
-                    if base_pose is not None and base == 7:
-                        cur_pose = base_pose.dot(self._joint2tips[idx + base])
-                    else:
-                        cur_pose = poses[-1].dot(self._joint2tips[idx + base])
                 poses.append(cur_pose.copy())
-                if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
-                    if base_pose is not None and base == 8:
-                        cur_pose = base_pose.copy()
-                    else:
-                        cur_pose = poses[-2].copy()
+            
+            if joint_values.shape[0] + base == 10 and len(self._end_effector) > 0: #for hand and finger
+                if len(poses) > 4:
+                    cur_pose = poses[-4].dot(self._joint2tips[7])
+                if base_pose is not None and base == 7:
+                    cur_pose = base_pose.dot(self._joint2tips[7])
+                poses[-3] = cur_pose.copy()
+                if base_pose is not None and base == 8:
+                    cur_pose = base_pose
+                poses[-2] = cur_pose.dot(pose2np(self._links[8].pose(joint_values[-2]))).copy()
+                poses[-1] = cur_pose.dot(pose2np(self._links[9].pose(joint_values[-1]))).copy()
             return poses
         print 'invalid joint to solve poses'
 
@@ -231,8 +232,8 @@ class robot_kinematics(object):
     def sample_ef(self, joints, size):
         # perturb prismatic joint for panda
         if size == len(self._links) and len(self._end_effector) > 0:
-            joints[-1] = 0 #np.random.uniform(0, 2.29); 
-            joints[-2] = 0 #np.random.uniform(0, 2.29);  #0.04*180/pi
+            joints[-1] = np.random.uniform(0, 2.29); 
+            joints[-2] = np.random.uniform(0, 2.29);  #0.04*180/pi
         return joints          
     
     def check_joint_limits(self, joint_values, base_link='right_arm_mount'):
@@ -301,7 +302,7 @@ class robot_kinematics(object):
                 offset_pose[:3, 3] *= -1 
             if base_idx + i == 9: # right finger has origin flipped in urdf :(
                 offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
-                offset_pose[1, 3] -= 0.026
+                offset_pose[1, 3] -= 0.026 #shifted center 
             pose[:, :, i] = pose[:, :, i].dot(offset_pose)
         
         if input_list:
