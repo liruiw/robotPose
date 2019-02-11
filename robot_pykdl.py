@@ -195,15 +195,16 @@ class robot_kinematics(object):
             
             if joint_values.shape[0] + base == len(self._links) and len(self._end_effector) > 0: #for hand and finger
                 hand_pose = np.eye(4)
-                if len(poses) > 4:
-                    hand_pose = poses[-4].dot(self._joint2tips[7])
-                    poses[-self._ef_num - 1] = hand_pose.copy()
-                elif base_pose is not None and base == 7:
-                    hand_pose = base_pose.dot(self._joint2tips[7])
-                    poses[-self._ef_num - 1] = hand_pose.copy()
-                elif base_pose is not None and base == 8:
+                hand_idx = -(self._ef_num + 1)
+                if len(poses) > -hand_idx: # arm 
+                    hand_pose = poses[hand_idx - 1].dot(self._joint2tips[hand_idx])
+                    poses[hand_idx] = hand_pose.copy()
+                elif base_pose is not None and base == len(self._links) + hand_idx: # link7
+                    hand_pose = base_pose.dot(self._joint2tips[hand_idx])
+                    poses[hand_idx] = hand_pose.copy()
+                elif base_pose is not None and base == len(self._links) + hand_idx + 1: # hand
                     hand_pose = base_pose
-                for i in range(1, self._ef_num + 1):
+                for i in range(1, -hand_idx):
                     poses[-i] = hand_pose.dot(pose2np(self._links[-i].pose(joint_values[-i]))).copy()
             return poses
         print 'invalid joint to solve poses'
