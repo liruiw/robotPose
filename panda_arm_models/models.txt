@@ -9,3 +9,4 @@ ycb_render/robotPose/panda_arm_models/link8.DAE
 ycb_render/robotPose/panda_arm_models/hand.DAE
 ycb_render/robotPose/panda_arm_models/finger.DAE
 ycb_render/robotPose/panda_arm_models/finger.DAE
+ycb_render/robotPose/panda_arm_models/camera.DAE

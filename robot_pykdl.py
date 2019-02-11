@@ -62,20 +62,17 @@ class robot_kinematics(object):
     Robot Kinematics with PyKDL
     """
     def __init__(self, robot):
-        #self._baxter = URDF.from_parameter_server(key='robot_description')
+        cur_path = os.path.dirname(os.path.abspath(__file__))
         if robot == 'panda_arm':
-            cur_path = os.path.dirname(os.path.abspath(__file__))
-            self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'panda_arm_hand.urdf'), 'r+').read())
-            self._tip_link = 'panda_hand'
-            self._end_effector = ['panda_leftfinger', 'panda_rightfinger']
+            self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'panda_arm_hand_camera.urdf'), 'r+').read()) 
         else: #baxter right limb
-            cur_path = os.path.dirname(os.path.abspath(__file__))
             self._robot = URDF.from_xml_string(open(os.path.join(cur_path,'baxter_base.urdf'), 'r+').read())
-            self._tip_link = 'right_wrist' 
-            self._end_effector = []
+        
         self._name = robot
-
-        self._kdl_tree = kdl_tree_from_urdf_model(self._robot)
+        self._kdl_tree, ef_info = kdl_tree_from_urdf_model(self._robot)
+        self._tip_link = ef_info.keys()[0]
+        self._end_effector = ef_info[self._tip_link]
+        self._ef_num = len(self._end_effector)
         self._base_link = self._robot.get_root() #set it to base
          #we are not interested in gripper
         self._tip_frame = PyKDL.Frame()
@@ -171,8 +168,8 @@ class robot_kinematics(object):
             axis, angle = mat2axangle(pose_joint[:3,:3]) 
             joint_values.append(angle)
             cur_pose = pose[:, :, idx]
-            if idx + base == 8 and len(self._end_effector) > 0: #right finger reuse hand pose
-                cur_pose = pose[:,:,-3].copy()
+            if idx + base >= len(self._links) - self._ef_num: # for all links attached with hand
+                cur_pose = pose[:,:,-self._ef_num - 1].copy()
         return rad2deg(np.array(joint_values)) 
 
     def solve_poses_from_joint(self, joint_values=None, base_link='right_arm_mount', base_pose=None):
@@ -196,16 +193,18 @@ class robot_kinematics(object):
                 cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
                 poses.append(cur_pose.copy())
             
-            if joint_values.shape[0] + base == 10 and len(self._end_effector) > 0: #for hand and finger
+            if joint_values.shape[0] + base == len(self._links) and len(self._end_effector) > 0: #for hand and finger
+                hand_pose = np.eye(4)
                 if len(poses) > 4:
-                    cur_pose = poses[-4].dot(self._joint2tips[7])
-                if base_pose is not None and base == 7:
-                    cur_pose = base_pose.dot(self._joint2tips[7])
-                poses[-3] = cur_pose.copy()
-                if base_pose is not None and base == 8:
-                    cur_pose = base_pose
-                poses[-2] = cur_pose.dot(pose2np(self._links[8].pose(joint_values[-2]))).copy()
-                poses[-1] = cur_pose.dot(pose2np(self._links[9].pose(joint_values[-1]))).copy()
+                    hand_pose = poses[-4].dot(self._joint2tips[7])
+                    poses[-self._ef_num - 1] = hand_pose.copy()
+                elif base_pose is not None and base == 7:
+                    hand_pose = base_pose.dot(self._joint2tips[7])
+                    poses[-self._ef_num - 1] = hand_pose.copy()
+                elif base_pose is not None and base == 8:
+                    hand_pose = base_pose
+                for i in range(1, self._ef_num + 1):
+                    poses[-i] = hand_pose.dot(pose2np(self._links[-i].pose(joint_values[-i]))).copy()
             return poses
         print 'invalid joint to solve poses'
 
@@ -231,9 +230,9 @@ class robot_kinematics(object):
 
     def sample_ef(self, joints, size):
         # perturb prismatic joint for panda
-        if size == len(self._links) and len(self._end_effector) > 0:
-            joints[-1] = np.random.uniform(0, 2.29); 
-            joints[-2] = np.random.uniform(0, 2.29);  #0.04*180/pi
+        if size == len(self._links):
+            for i in range(1, self._ef_num + 1):
+                joints[-i] = np.random.uniform(0, 2.29);  #0.04*180/pi
         return joints          
     
     def check_joint_limits(self, joint_values, base_link='right_arm_mount'):
@@ -302,7 +301,7 @@ class robot_kinematics(object):
                 offset_pose[:3, 3] *= -1 
             if base_idx + i == 9: # right finger has origin flipped in urdf :(
                 offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
-                offset_pose[1, 3] -= 0.026 #shifted center 
+                offset_pose[1, 3] -= 0.026262 #shifted center 
             pose[:, :, i] = pose[:, :, i].dot(offset_pose)
         
         if input_list:
@@ -340,10 +339,12 @@ def main():
     print 'robot name', args.robot
     renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
     if args.robot == 'panda_arm':
-        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger']
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger', 'camera']
         base_link = 'panda_link0'
         if args.test == 'middle':
             base_link = 'panda_link3'
+        if args.test == 'end':
+            base_link = 'panda_link7'
         base_idx = 0
         name = base_link.strip().split('_')[-1]
         if name in models:
@@ -376,7 +377,7 @@ def main():
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(10):
+    for index in range(20):
         file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
         if args.robot == 'panda_arm':  #correspond with move_arm
@@ -387,7 +388,8 @@ def main():
             rot = euler2mat(*r)
             pos = np.matmul(rot, initial_pt)
             pos = (pos / np.linalg.norm(pos)) * np.random.uniform(low=2.3, high=2.5)
-            pos = np.array([0.6, -1.8, 1.2])        
+            pos = np.array([0.6, -1.8, 1.2])      
+            #pos = np.array([0.5, 0, 0.2])   
             renderer.set_camera(pos, 2*pos, [0,0,-1])
             renderer.set_light_pos(pos + np.random.uniform(-0.5, 0.5, 3))
             intensity = np.random.uniform(0.8, 2)
@@ -414,8 +416,10 @@ def main():
             poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) #original -> center pose
         
         if args.robot != 'baxter':
-
-            poses_p, joint = robot.gen_rand_pose(base_link)[:len(cls_indexes)]
+            rand_base = np.eye(4)
+            quat = np.random.randn(4)
+            rand_base[:3,:3] = quat2mat(quat / np.linalg.norm(quat))
+            poses_p, joint = robot.gen_rand_pose(base_link, base_pose=rand_base)[:len(cls_indexes)]
             joint_test = robot.solve_poses_from_joint(np.array(joint), base_link, base_pose=np.eye(4))
             print 'joint test ==================='
             print joint
@@ -432,10 +436,10 @@ def main():
             print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
 
             print 'perturb test ==================='
-            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4))
+            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=rand_base)
             poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
             poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
-            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=np.eye(4), center_offset=True)
+            poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=rand_base, center_offset=True)
             # #poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
             # print perturb
             print '======================'         

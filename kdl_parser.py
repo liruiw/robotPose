@@ -55,8 +55,11 @@ def urdf_inertial_to_kdl_rbi(i):
 def kdl_tree_from_urdf_model(urdf):
     root = urdf.get_root()
     tree = kdl.Tree(root)
+    ef_tree = dict() # store the names for now
     def add_children_to_tree(parent):
         if parent in urdf.child_map:
+            if len(urdf.child_map[parent]) > 1:
+                ef_tree[parent] = [child_name for _, child_name in urdf.child_map[parent]]
             for joint, child_name in urdf.child_map[parent]:
                 for lidx, link in enumerate(urdf.links):
                     if child_name == link.name:
@@ -73,8 +76,8 @@ def kdl_tree_from_urdf_model(urdf):
                                                       kdl_origin, kdl_inert)
                                 tree.addSegment(kdl_sgm, parent)
                                 add_children_to_tree(child_name)
-    add_children_to_tree(root)
-    return tree
+    add_children_to_tree(root) 
+    return tree, ef_tree
 
 def main():
     import sys
@@ -96,7 +99,7 @@ def main():
             print'fixed joint name: {}, parent :{}, child: {}'.format(\
                 joint.name, joint.parent, joint.child)
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
-    tree = kdl_tree_from_urdf_model(robot)
+    tree, _ = kdl_tree_from_urdf_model(robot)
     print "KDL joints: %d" % tree.getNrOfJoints()
     print "Segments: %d" % tree.getNrOfSegments()
     import random
@@ -116,6 +119,7 @@ def main():
     print 'left right finger'
     print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
     print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
+    print tree.getChain('panda_hand', 'panda_hand_camera').getSegment(0).pose(0.04)
     print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()
