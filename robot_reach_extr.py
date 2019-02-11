@@ -11,7 +11,7 @@ import numpy.random as random
 from numpy.linalg import inv
 from ycb_renderer import YCBRenderer
 import torch
-from robotPose.robot_pykdl import *
+from robot_pykdl import *
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection = '3d')

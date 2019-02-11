@@ -9,10 +9,10 @@ if robot_name == 'panda_arm':
 elif robot_name == 'baxter':
 	models = ['dummy1', 'dummy2','S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
 obj_paths = [
-	'../ycb_render/robotPose/{}_models/{}.DAE'.format(robot_name,item) for item in models]
-model_filename = '../ycb_render/robotPose/{}_models/models.txt'.format(robot_name)
-extent_filename = '../ycb_render/robotPose/{}_models/extents.txt'.format(robot_name)
-offset_filename = '../ycb_render/robotPose/{}_models/center_offset.txt'.format(robot_name)
+	'{}_models/{}.DAE'.format(robot_name,item) for item in models]
+model_filename = '{}_models/models.txt'.format(robot_name)
+extent_filename = '{}_models/extents.txt'.format(robot_name)
+offset_filename = '{}_models/center_offset.txt'.format(robot_name)
 
 def homotrans(M, p):
     p = np.asarray(p)
@@ -56,5 +56,5 @@ for i, path in enumerate(obj_paths):
 	f.write('%f %f %f\n'%(center[0],center[1],center[2]))
 	f = open(model_filename, "a+")
 	f.write("{}\n".format(path[3:]))
-	xyz_file = '../ycb_render/robotPose/{}_models/{}.xyz'.format(robot_name,models[i])
+	xyz_file = '{}_models/{}.xyz'.format(robot_name,models[i])
 	np.savetxt(xyz_file, xyz, fmt="%f")

@@ -236,7 +236,7 @@
   <joint name="panda_hand_camera_joint" type="fixed">
     <parent link="panda_hand"/>
     <child link="panda_hand_camera"/>
-    <origin rpy="-1.57079632679 0 -1.57079632679  " xyz="0.04 0 0.03"/>
+    <origin rpy="-1.57079632679 0 -1.57079632679  " xyz="0.036 0 0.031"/>
   </joint>
 </robot>
 
