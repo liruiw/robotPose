@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import numpy as np
 import PyKDL
 import scipy.io as sio
@@ -80,7 +79,7 @@ class robot_kinematics(object):
                                                   self._tip_link)
         self._empty_link_ids = []
         self.center_offset = self.load_offset()
-        self._links = self.load_end_effector()
+        self._links, self._link_names = self.get_link_info()
         self._joint_name, self._joint_limits, self._joint2tips, self._pose_0 = self.get_joint_info()
         self.prepare_virtual_links()
         
@@ -99,15 +98,17 @@ class robot_kinematics(object):
         print "KDL joints: %d" % self._kdl_tree.getNrOfJoints()
         print "KDL segments: %d" % self._kdl_tree.getNrOfSegments()
     
-    def load_end_effector(self):
-        links = []
+    def get_link_info(self):
+        links = []; link_names = [self._base_link];
         for idx in range(self._arm_chain.getNrOfSegments()):
             links.append(self._arm_chain.getSegment(idx))
+            link_names.append(self._arm_chain.getSegment(idx).getName().encode("utf-8"))
         for end_effector in self._end_effector:
             chain = self._kdl_tree.getChain(self._tip_link, end_effector)
             for idx in range(chain.getNrOfSegments()):
                 links.append(chain.getSegment(idx))
-        return links
+                link_names.append(chain.getSegment(idx).getName().encode("utf-8"))
+        return links, link_names
        
     def prepare_virtual_links(self):
         # remove the virtual link 8 and combine the joint poses with hand 
@@ -115,6 +116,7 @@ class robot_kinematics(object):
         for i, empty_link in enumerate(self._empty_link_ids):
             idx = empty_link - i
             del self._links[idx]
+            del self._link_names[idx + 1]
             hand_pose = self._joint2tips[idx].dot(self._joint2tips[idx+1])
             self._joint2tips[idx+1] = hand_pose
             del self._joint2tips[idx]
@@ -283,6 +285,9 @@ class robot_kinematics(object):
                continue
             offset_pose = np.eye(4)
             offset_pose[:3, 3] = offset[i, :]
+            if i == 10: # right finger has origin flipped in urdf :(
+                offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
+                offset_pose[1, 3] -= 0.026262 #shifted center 
             offset_list.append(offset_pose)
         #extent = max - min, center = (max + min)/2 (3D bounding box)
         return offset_list
@@ -300,11 +305,7 @@ class robot_kinematics(object):
             offset_pose = self.center_offset[base_idx + i].copy()
             if dir == 'on':     
                 offset_pose[:3, 3] *= -1 
-            if base_idx + i == 9: # right finger has origin flipped in urdf :(
-                offset_pose[:3, :3] = rotZ(np.pi)[:3, :3]  
-                offset_pose[1, 3] -= 0.026262 #shifted center 
             pose[:, :, i] = pose[:, :, i].dot(offset_pose)
-        
         if input_list:
             return M2list(pose)
         return pose
@@ -318,10 +319,8 @@ class robot_kinematics(object):
             return self._arm_chain.getSegment(link_id).getName()
 
     def _get_base_idx_shifted(self, base_link):
-        num = self._kdl_tree.getChain(self._base_link, base_link).getNrOfSegments()
-        if num > 7:
-            num -= 1 #account for the replaced link
-        return num
+        return self._link_names.index(base_link)
+
 def main():
 
     import argparse

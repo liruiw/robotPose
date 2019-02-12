@@ -1,0 +1,23 @@
+<launch>
+#  default="$GRASPIT/worlds/sugar_box_init.xml"
+   <arg name="output_dir" default="/home/liruiw/Projects/grasp/src/graspit_pose/script/output"/>
+   <arg name="default_dir" default="$(env GRASPIT)"/>
+   <arg name="world" default="empty"/>
+   <arg name="robot" default="panda"/>
+   <arg name="object" default="potted_meat_can"/>
+   <arg name="max_plan_iter" default="120000" />
+   <arg name="max_plan_result" default="30" />
+   <arg name="iter_count" default="100" />
+    <node name="graspit_pose" pkg="graspit_pose" type="graspit_pose" respawn="false" required="true"
+      args="$(arg output_dir) $(arg world) $(arg max_plan_iter)  $(arg max_plan_result) $(arg default_dir) $(arg object) $(arg robot) $(arg iter_count)"
+      output="screen">
+      <param name="output_dir" value="$(arg output_dir)"/>
+      <param name="default_dir" value="$(arg default_dir)"/>
+      <param name="world" value="$(arg world)"/>
+      <param name="robot" value="$(arg robot)"/>
+      <param name="object" value="$(arg object)"/>
+      <param name="max_plan_iter" value="$(arg max_plan_iter)"/>
+      <param name="max_plan_result" value="$(arg max_plan_result)"/>
+      <param name="iter_count" value="$(arg iter_count)"/>
+    </node>
+</launch>
