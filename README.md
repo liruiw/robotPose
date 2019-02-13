@@ -1,10 +1,9 @@
 # robotPose
 ### Installation
-Install vtk, transforms3d, lxml 
+Install transforms3d, lxml 
 ```Shell
-pip install vtk (conda install -c conda-forge vtk)
-pip install transforms3d
-pip install lxml
+pip (conda) install transforms3d
+pip (conda)  install lxml
 ```
 urdf_parser_py is from https://github.com/ros/urdf_parser_py
 Install pykdl
@@ -53,3 +52,7 @@ After you start the simulation, test moving the robot by
 ```Shell
 python move_arm.py --robot=panda_arm
 ```
+To use graspit for panda hand, we use this package: **https://github.com/JenniferBuehler/graspit-pkgs**
+Follow its wiki page to compile graspit and convert the urdf file for panda hand. Place the grasp folder 
+inside the same directory and catkin_make. You would need to resolve all files and path. Also, you have 
+to convert YCB object mesh to wrl.
