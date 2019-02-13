@@ -9,9 +9,18 @@ float dgauss(float mean, float stdDev) {
 
 void graspPoseCallback(const geometry_msgs::PoseArray &poses)
 {
-  // run the main program here
+  // load poses
 }
 
+void classIndexCallback(const std_msgs::Int32MultiArray &cls_indexes)
+{
+  // load classes
+}
+
+void targetIndexCallback(const std_msgs::Int32 &target_index)
+{
+  // load classes
+}
 int main(int argc, char **argv) {
 	
     // The world file name will be the first argument
@@ -24,12 +33,13 @@ int main(int argc, char **argv) {
 	ros::init(argc, argv, "grasp_listener");
 	ros::NodeHandle nh("~");
 	ros::Subscriber grasp_sub = nh.subscribe("poses", 1000, graspPoseCallback);
+	ros::Subscriber classes_sub = nh.subscribe("target", 1000, targetIndexCallback); //same order
 	nh.getParam("default_dir", default_dir);
 	nh.getParam("world", world);
 	nh.getParam("output_dir", output_dir);
 	nh.getParam("max_plan_iter", max_plan_iter);
 	nh.getParam("robot", robot);
-	nh.getParam("object", object);
+	//nh.getParam("object", object);
 	nh.getParam("iter_count", iter_count);
 	nh.getParam("max_plan_result", max_plan_result);
 	nh.getParam("mat_file", mat_file);
@@ -56,14 +66,14 @@ int main(int argc, char **argv) {
 	SHARED_PTR<GraspIt::GraspItSceneManager> graspitMgr(new GraspIt::GraspItSceneManagerHeadless());
 	if (obstacle){
 		graspitMgr->loadWorld(tableworldFilename); //load the world with anchor		
-		mat = Mat_Open(mat_file.c_str(), MAT_ACC_RDWR);
-		poses = Mat_VarRead(mat, (char*)"poses");
-		cls_indexes = Mat_VarRead(mat, (char*)"cls_indexes");
+		// mat = Mat_Open(mat_file.c_str(), MAT_ACC_RDWR);
+		// poses = Mat_VarRead(mat, (char*)"poses");
+		// cls_indexes = Mat_VarRead(mat, (char*)"cls_indexes");
 		std::vector<GraspIt::EigenTransform> objectTransformList;
 		std::vector<std::string> objectFileList;
 		unsigned poseSize = poses->nbytes/poses->data_size;
 		unsigned clsSize = cls_indexes->nbytes/cls_indexes->data_size ;
-		const double *poseData = static_cast<const double*>(poses->data) ;	
+		const double *poseData = static_cast<const double*>(poses->data); //load this from ros	
 		const double *clsData = static_cast<const double*>(cls_indexes->data) ;
 		Eigen::Matrix4d poseMatrix; 	
 		
