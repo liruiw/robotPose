@@ -17,23 +17,16 @@ def mkdir_if_missing(dst_dir):
 	if not os.path.exists(dst_dir):
 		os.makedirs(dst_dir)
 
-def get_best_grasp(object_pose):
-	best_pos = -1; best_poses = []
-	for idx in range(pose_grasp.shape[0]):
-		if energy[idx] > 45:
-			continue
-		pose_scene = [object_pose.dot(pose_grasp[idx])] #gripper -> object
-		joint = max(min((20 + joint_val[idx])/1000, 0.04), 0) #from eigen.xml
-		joint *= 180 / np.pi
-		joint = np.array([joint, joint, joint]) 
-		finger_poses = robot.solve_poses_from_joint(joint, 'panda_hand', pose_scene[0])
-		pose_scene += finger_poses
-		pose_scene = robot.offset_pose_center(pose_scene, dir='off', base_link='panda_link7') #offset hand as well
-		contact_pos = (pose_scene[2] + pose_scene[3])[2, 3]/2 #two fingers
-		if contact_pos > best_pos:
-			best_pos = contact_pos
-			best_poses = pose_scene[:]
-	return best_poses
+def get_best_grasp(pose, object_pose, joint_val):
+	pose_scene = [object_pose.dot(pose)] #gripper -> object
+	joint = max(min((20 + joint_val)/1000, 0.04), 0) #from eigen.xml
+	joint *= 180 / np.pi
+	joint = np.array([joint, joint, joint]) 
+	finger_poses = robot.solve_poses_from_joint(joint, 'panda_hand', pose_scene[0])
+	pose_scene += finger_poses
+	pose_scene = robot.offset_pose_center(pose_scene, dir='off', base_link='panda_link7') #offset hand as well
+	contact_pos = (pose_scene[2] + pose_scene[3])[2, 3]/2 #two fingers
+	return pose_scene
 
 def call_back(pose_grasp):
 	models = ['hand', 'finger', 'finger', 'camera']
@@ -49,7 +42,7 @@ def call_back(pose_grasp):
 
 	cls_indexes = range(len(obj_paths)) #7
 	renderer = YCBRenderer(width=width, height=height, render_marker=False, robot='panda_arm')
-	robot = robot_kinematics('panda_arm')
+	
 	renderer.load_objects(obj_paths, texture_paths, colors)
 	renderer.set_camera_default()
 	renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
@@ -59,25 +52,26 @@ def call_back(pose_grasp):
 	seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 	obj_name = '_'.join(classes[target].split('_')[1:])
 	print 'output/%s_grasp_pose.txt'%obj_name
-	rot = quat2mat(pose_grasp.orientation)
+	rot = quat2mat([pose_grasp.orientation.x, pose_grasp.orientation.y, pose_grasp.orientation.z,\
+		pose_grasp.orientation.w])
 	joint_val = 5 #pose_grasp[:, -2]
 	energy = 40 #pose_grasp[:, -1]
-	pose_grasp = np.eye(4)
-	pose_grasp[:3, 3] = pose_grasp.position
-	pose_grasp[:3, :3] = quat2mat(rot)
+	pose_grasp_ = np.eye(4)
+	pose_grasp_[0, 3] = pose_grasp.position.x
+	pose_grasp_[1, 3] = pose_grasp.position.y
+	pose_grasp_[2, 3] = pose_grasp.position.z
+	pose_grasp_[:3, :3] = rot
 	mkdir_if_missing('test_image')
 	mkdir_if_missing('test_image/%s'%obj_name)
-	pose_grasp[:, :3, 3] /= 1000 #scale the translation
+	pose_grasp_[:3, 3] /= 1000 #scale the translation
 	pos = [0, 0, 0]
 
-
-
-	for idx in range(pose_grasp.shape[0]):
+	for idx in range(pose_grasp_.shape[0]):
 		target_pose = np.eye(4)
 		pose = mat_poses[:, :, np.where(cls_indexes == target)]
 		quat = np.random.randn(4)
 		
-		pose_scene = get_best_grasp(object_pose[target_idx])
+		pose_scene = get_best_grasp(pose_grasp_, object_pose[target_idx], joint_val)
 		pose_scene += object_pose
 		poses = []
 		for i in range(len(pose_scene)):
@@ -98,7 +92,7 @@ def call_back(pose_grasp):
 		mask = cv2.cvtColor(seg_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR) #
 		test_img = np.zeros(image.shape)
 		test_img[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]
-		cv2.imwrite('test_image/%s/%06d.png'%(obj_name, idx),test_img)
+		cv2.imwrite('test_image/%s/ros_%06d.png'%(obj_name, idx),test_img)
 		theta = 0; z = 0;
 		while len(sys.argv) > 3:
 			renderer.render(cls_indexes, image_tensor, seg_tensor)
@@ -149,7 +143,7 @@ for i, cls in enumerate(cls_indexes):
 	if cls == target:
 		target_idx = i
 	objs.append([name for name in os.listdir('models') if name.endswith(classes[cls])][0])
-print objs
+robot = robot_kinematics('panda_arm')
 
 # ros
 def example_publish():
@@ -159,18 +153,26 @@ def example_publish():
 	target_pub = rospy.Publisher('grasp_target', Int32, queue_size=1)
 	classes_pub = rospy.Publisher('grasp_classes', Int32MultiArray, queue_size=1)
 	rospy.Subscriber('grasp_pose', Pose, call_back)
-	poseArr = []
-	class_msg = Int32MultiArray()
-	class_msg.data = cls_indexes
-	classes_pub.publish(class_msg)
-	target_pub.publish(target)
-	msgs = PoseArray()
-	for i in range(cls_indexes.shape[0]):
-		pose = Pose(object_pose[i][:3, 3], mat2quat(object_pose[i][:3, :3])) #w order?
-		msgs.poses.append(pose)
-	pose_pub.publish(msgs)
-	rospy.sleep(0.01)
-	rospy.spin()
+	while not rospy.is_shutdown():
+		poseArr = []
+		class_msg = Int32MultiArray()
+		class_msg.data = cls_indexes
+		classes_pub.publish(class_msg)
+		target_pub.publish(target)
+		msgs = PoseArray()
+		for i in range(cls_indexes.shape[0]):
+			msg = Pose()
+			quat = mat2quat(object_pose[i][:3, :3])
+			msg.orientation.x = quat[1]
+			msg.orientation.y = quat[2]
+			msg.orientation.z = quat[3]
+			msg.orientation.w = quat[0]
+			msg.position.x = object_pose[i][0, 3]
+			msg.position.y = object_pose[i][1, 3]
+			msg.position.z = object_pose[i][2, 3]
+			msgs.poses.append(msg)
+		pose_pub.publish(msgs)
+		rate.sleep()
 
 if __name__ == '__main__':
     try:

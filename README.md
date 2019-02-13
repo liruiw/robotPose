@@ -54,7 +54,7 @@ python move_arm.py --robot=panda_arm
 ```
 To use graspit for panda hand, please install **https://graspit-simulator.github.io/build/html/installation_linux.html**. Then install third party library **https://github.com/JenniferBuehler/graspit-pkgs**. Place the grasp folder inside the src/ and do catkin_make. You would need to resolve all files and path. (Models and Worlds are provided). 
 
-Online planning (working on ros) or generate new grasps (require MATIO) by roslaunch graspit_pose graspit_pose.launch. Take a look at its parameters.
+Online planning (working on ros) or generate new grasps (require MATIO) by roslaunch graspit_pose graspit_pose.launch. Take a look at its parameters. roslaunch graspit_pose graspit_pose_ros.launch for ros interface
 
 For visualization after generating the grasps. (assume everything in its defined path). Create the softlinks as shown in script/.
 scale_wrl_file.py can be used to scale the mesh file after converting by meshlab (e.g python scale_wrl_file.py cracker_box).  
@@ -62,3 +62,5 @@ scale_wrl_file.py can be used to scale the mesh file after converting by meshlab
 vis_grasp_pose.py can visualize one grasp (e.g python vis_grasp_pose.py cracker_box). 3D visualize append anything at the end as argument.
 
 vis_grasp_pose_all.py can visualize a grasp in a YCB configuration. (e.g python vis_grasp_pose.py 0040 5)
+
+vis_grasp_pose_ros.py can communicate in with planner in ros fashion. (e.g python vis_grasp_pose_ros.py 0040 5)
