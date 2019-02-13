@@ -5,5 +5,4 @@
 *.o
 *.obj
 *.mtl
-*.xml
 test_image
