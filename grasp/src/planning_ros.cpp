@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 	obstacleTransform.setIdentity();
 	std::ofstream grasp_pose_file;
 	ros::Rate loop_rate(30);
-	bool repeated = false;
+	
 	SHARED_PTR<GraspIt::GraspItSceneManager> graspitMgr(new GraspIt::GraspItSceneManagerHeadless());
 	while (ros::ok()) { 
 		if (objectReady && classReady && poseReady) {
@@ -108,16 +108,17 @@ int main(int argc, char **argv) {
 					relativePose.translate(posePosition[i]);
 					relativePose.rotate(poseOrientation[i]);
 					objectTransformList.push_back(relativePose);
-					if(!repeated) {
-			    		graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], false, relativePose); //place as occluder
-			    	}
-			    	else{
-			    		graspitMgr->moveObject(YCB_classes[ros_clsData[i]], relativePose);
-			    	}
+					if(ros_clsData[i] < 10) {
+						if(!repeated) {
+				    		graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], false, relativePose); //place as occluder
+				    	}
+				    	else{
+				    		graspitMgr->moveObject(YCB_classes[ros_clsData[i]], relativePose);
+				    	}						
+					}
 			    }
 			}
 			
-		
 			Eigen::Vector3d gripperPos;
 			std::vector<Eigen::Matrix4d> graspPose;
 			std::vector<double> jointVals;

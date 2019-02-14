@@ -30,5 +30,6 @@ std::vector<int> ros_clsData;
 bool poseReady;
 bool classReady;
 bool objectReady;
+
 std::vector<Eigen::Vector3d> posePosition;
 std::vector<Eigen::Quaterniond> poseOrientation;
