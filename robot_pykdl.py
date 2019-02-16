@@ -80,18 +80,21 @@ class robot_kinematics(object):
          #we are not interested in gripper
         self._arm_chain = self._kdl_tree.getChain(self._base_link,
                                                   self._tip_link)
+        self._num_jnts = self._arm_chain.getNrOfJoints()
         self._empty_link_ids = []
         self.center_offset = self.load_offset()
         self._links, self._link_names = self.get_link_info()
-        self._joint_name, self._joint_limits, self._joint2tips, self._pose_0 = self.get_joint_info()
+        self._joint_name, self._joint_limits, self._joint2tips, self._pose_0, self.joint_limit_list \
+                                 = self.get_joint_info()
         self.prepare_virtual_links()
-        self._num_jnts = self._arm_chain.getNrOfJoints()
-        self._fk_p_kdl = PyKDL.ChainFkSolverPos_recursive(self._arm_chain)
+        
+        self._fk_p_kdl = PyKDL.ChainFkSolverPos_recursive(self._arm_chain) # 
         self._fk_v_kdl = PyKDL.ChainFkSolverVel_recursive(self._arm_chain)
         self._ik_v_kdl = PyKDL.ChainIkSolverVel_pinv(self._arm_chain)
-        self._ik_p_kdl = PyKDL.ChainIkSolverPos_NR(self._arm_chain,
-                                                   self._fk_p_kdl,
-                                                    self._ik_v_kdl)        
+        self._ik_p_kdl = PyKDL.ChainIkSolverPos_NR(self._arm_chain, 
+                                                    self._fk_p_kdl,
+                                                    self._ik_v_kdl, maxiter=10000) 
+        #self._ik_p_kdl =  PyKDL.ChainIkSolverPos_LMA(self._arm_chain, _maxiter=1000)
         print 'robot name {} with base link {}'.format(self._name, self._base_link)
         print self._joint_name, self._joint_limits
         # KDL Solvers not used for now
@@ -142,8 +145,10 @@ class robot_kinematics(object):
         joints = []
         segment_joint2tip = []
         initial_pose = []
+        joint_limit_list = [PyKDL.JntArray(self._num_jnts), PyKDL.JntArray(self._num_jnts)]
         for segment in self._links:
             joint = segment.getJoint()
+
             joint_name = joint.getName().encode("utf-8") #get rid of unicode
             segment_joint2tip.append(pose2np(segment.getFrameToTip())) #save fix initial angle pose
             initial_pose.append(pose2np(segment.pose(0)))
@@ -154,7 +159,11 @@ class robot_kinematics(object):
         for joint in robot_description.joints:
             if joint.name in joints and joint.limit:
                 joint_limits[joint.name] = [joint.limit.lower,joint.limit.upper]
-        return joints, joint_limits, segment_joint2tip, initial_pose
+                index = joints.index(joint.name)
+                if index < self._num_jnts:
+                    joint_limit_list[0][index] = joint.limit.lower
+                    joint_limit_list[1][index] = joint.limit.upper
+        return joints, joint_limits, segment_joint2tip, initial_pose, joint_limit_list
 
     def solve_joint_from_poses(self, pose, base_link='right_arm_mount', base_pose=None): 
         """
@@ -189,35 +198,34 @@ class robot_kinematics(object):
         If a base pose is given, starts at that pose otherwise insert 0 degree joint pose at front
         """
         poses = []
-        if self.check_joint_limits(joint_values, base_link=base_link):
-            joint_values = deg2rad(joint_values)
-            cur_pose = base_pose
-            base = self._get_base_idx_shifted(base_link)
-            if base_pose is None: # asssume all zero angles
-                cur_pose = np.eye(4)
-                for idx in xrange(base):     
-                    pose_end = self._pose_0[idx].copy()
-                    cur_pose = cur_pose.dot(pose_end)
+        #if self.check_joint_limits(joint_values, base_link=base_link): #no need
+        joint_values = deg2rad(joint_values)
+        cur_pose = base_pose
+        base = self._get_base_idx_shifted(base_link)
+        if base_pose is None: # asssume all zero angles
+            cur_pose = np.eye(4)
+            for idx in xrange(base):     
+                pose_end = self._pose_0[idx].copy()
+                cur_pose = cur_pose.dot(pose_end)
 
-            for idx in xrange(joint_values.shape[0]): 
-                cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
-                poses.append(cur_pose.copy())
-            hand_pose = np.eye(4)
-            hand_idx = len(self._links) - (self._ef_num + 1)
-            if len(poses) > hand_idx: # arm 
-                hand_pose = poses[hand_idx - 1].dot(self._joint2tips[hand_idx])
+        for idx in xrange(joint_values.shape[0]): 
+            cur_pose = cur_pose.dot(pose2np(self._links[idx + base].pose(joint_values[idx])))
+            poses.append(cur_pose.copy())
+        hand_pose = np.eye(4)
+        hand_idx = len(self._links) - (self._ef_num + 1)
+        if len(poses) > hand_idx: # arm 
+            hand_pose = poses[hand_idx - 1].dot(self._joint2tips[hand_idx])
+            poses[hand_idx] = hand_pose.copy()
+        if joint_values.shape[0] + base == len(self._links) and len(self._end_effector) > 0: #for hand and finger   
+
+            if base_pose is not None and base == hand_idx: # link7
+                hand_pose = base_pose.dot(self._joint2tips[hand_idx])
                 poses[hand_idx] = hand_pose.copy()
-            if joint_values.shape[0] + base == len(self._links) and len(self._end_effector) > 0: #for hand and finger   
-
-                if base_pose is not None and base == hand_idx: # link7
-                    hand_pose = base_pose.dot(self._joint2tips[hand_idx])
-                    poses[hand_idx] = hand_pose.copy()
-                elif base_pose is not None and base ==  hand_idx + 1: # hand
-                    hand_pose = base_pose
-                for i in range(hand_idx + 1, len(self._links)):
-                    poses[i] = hand_pose.dot(pose2np(self._links[i].pose(joint_values[i]))).copy()
-            return poses
-        print 'invalid joint to solve poses'
+            elif base_pose is not None and base ==  hand_idx + 1: # hand
+                hand_pose = base_pose
+            for i in range(1, self._ef_num + 1):
+                poses[-i] = hand_pose.dot(pose2np(self._links[-i].pose(joint_values[-i]))).copy()
+        return poses
 
     def perturb_pose(self, pose, base_link='right_arm_mount', scale=5, base_pose=None, center_offset=False):
         """
@@ -428,13 +436,11 @@ def main():
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(10):
+    for index in range(50):
         file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
         if args.robot == 'panda_arm':  #correspond with move_arm
             initial_pt = np.array([0,0,1])     
-            #pos = np.array([0.6, -1.8, 1.2])      
-            #pos = np.array([0.5, 0, 0.2])   
             renderer.set_camera(camera_pos, 2*camera_pos, [0,0,-1])
             renderer.set_light_pos(camera_pos + np.random.uniform(-0.5, 0.5, 3))
             intensity = np.random.uniform(0.8, 2)
@@ -508,58 +514,62 @@ def main():
         test_img[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]
         arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
+        if args.test == 'all' and args.robot == 'panda_arm': 
+            print 'IK test ======================' 
+            # ros quat xyzw | transforms3d wxyz
+            _, joints = robot.gen_rand_pose(base_link)
 
-        print 'IK test ======================' 
-        # ros quat xyzw | transforms3d wxyz
-        _, joints = robot.gen_rand_pose(base_link)
+            joints = deg2rad(joints[:7])
+            print joints
+            p = robot.forward_position_kinematics(joint_values=np.array(joints))
+            pos = p[0:3]
+            rot = p[3:]
+            print 'fk', joints, pos
+            # read the current joints and input
+            joints =  robot.inverse_kinematics(pos, rot)
+            if joints is not None:
+                p_ = robot.forward_position_kinematics(joint_values=joints) #
+                print 'ik', joints, p_[0:3]
+            else:
+                print 'no solution found by ik solver'
+            pos_view = renderer.V[:3,:3].dot(pos) + renderer.V[:3, 3]
+            center = camera_intrinsics.dot(pos_view)
+            center = center / center[2]
+            
+            arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
+            x = int(center[0])
+            y = int(center[1])
+            joints = rad2deg(joints)
+            joints_ = np.zeros(joints.shape[0] + 1)
+            joints_[:joints.shape[0]] = joints       
+            p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
+            print 'pos', p_[:3, 3], pos
+            if joints is not None:
+                joints[4] -= np.pi
+                poses_p = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
+                poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
+                poses = []
+                for i in range(len(poses_p)):
+                    pose_i = poses_p[i]
+                    rot = mat2quat(pose_i[:3,:3])
+                    trans = pose_i[:3,3]
+                    poses.append(np.hstack((trans,rot))) 
+                renderer.set_poses(poses)
+                renderer.render(range(len(joints)), image_tensor, seg_tensor)
+                image_tensor = image_tensor.flip(0)
+                seg_tensor = seg_tensor.flip(0)
 
-        joints = deg2rad(joints[:7])
-        print joints
-        p = robot.forward_position_kinematics(joint_values=np.array(joints))
-        pos = p[0:3]
-        rot = p[3:]
-        print 'fk', joints, pos
-        # read the current joints and input. Might fail
-        joints =  robot.inverse_kinematics(pos, rot, joints + np.random.uniform(-0.1, 0.1, size=7)) # close seed to avoid failure
-        p_ = robot.forward_position_kinematics(joint_values=joints) #
-        print 'ik', joints, p_[0:3]
-        pos_view = renderer.V[:3,:3].dot(pos) + renderer.V[:3, 3]
-        center = camera_intrinsics.dot(pos_view)
-        center = center / center[2]
-        
-        arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
-        x = int(center[0])
-        y = int(center[1])
-        joints = rad2deg(joints)
-        joints_ = np.zeros(joints.shape[0] + 1)
-        joints_[:joints.shape[0]] = joints
-        p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
-        print 'pos', p_[:3, 3], pos
-        if joints is not None:
-            poses_p = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
-            poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
-            poses = []
-            for i in range(len(poses_p)):
-                pose_i = poses_p[i]
-                rot = mat2quat(pose_i[:3,:3])
-                trans = pose_i[:3,3]
-                poses.append(np.hstack((trans,rot))) 
-            renderer.set_poses(poses)
-            renderer.render(range(len(joints)), image_tensor, seg_tensor)
-            image_tensor = image_tensor.flip(0)
-            seg_tensor = seg_tensor.flip(0)
+                im = image_tensor.cpu().numpy()
+                im = np.clip(im, 0, 1)
+                im = im[:, :, (2, 1, 0)] * 255
+                image = im.astype(np.uint8)
 
-            im = image_tensor.cpu().numpy()
-            im = np.clip(im, 0, 1)
-            im = im[:, :, (2, 1, 0)] * 255
-            image = im.astype(np.uint8)
+                mask = cv2.cvtColor(seg_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR) #
+                arm_test_image[y-20:y+20, x-20:x+20, :] = np.array([255, 0, 0])
+                arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
 
-            mask = cv2.cvtColor(seg_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR) #
-            arm_test_image[y-20:y+20, x-20:x+20, :] = np.array([255, 0, 0])
-            arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
-
-            cv2.imwrite( 'test_image/ik_%06d-color.png' % index, arm_test_image)
-        print '======================'
+                cv2.imwrite( 'test_image/ik_%06d-color.png' % index, arm_test_image)
+            print '======================'
 
 
 if __name__ == "__main__":
