@@ -45,10 +45,10 @@ int main(int argc, char **argv) {
 	//load all ros param
 	ros::init(argc, argv, "grasp_listener");
 	ros::NodeHandle nh;
-	ros::Subscriber grasp_sub = nh.subscribe("object_poses", 1000, objectPoseCallback);
-	ros::Subscriber target_sub = nh.subscribe("grasp_target", 1000, targetIndexCallback); //same order
-	ros::Subscriber classes_sub = nh.subscribe("grasp_classes", 1000, classIndexCallback); //same order
-	ros::Publisher  grasp_pub = nh.advertise<geometry_msgs::Pose>("grasp_pose", 1000);
+	ros::Subscriber grasp_sub = nh.subscribe("object_poses", 1, objectPoseCallback);
+	ros::Subscriber target_sub = nh.subscribe("grasp_target", 1, targetIndexCallback); //same order
+	ros::Subscriber classes_sub = nh.subscribe("grasp_classes", 1, classIndexCallback); //same order
+	ros::Publisher  grasp_pub = nh.advertise<geometry_msgs::PoseArray>("grasp_pose", 1);
 	nh.getParam("default_dir", default_dir);
 	nh.getParam("world", world);
 	nh.getParam("output_dir", output_dir);
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 	obstacleTransform.setIdentity();
 	std::ofstream grasp_pose_file;
 	ros::Rate loop_rate(30);
-	
+	geometry_msgs::PoseArray output_msg;
 	SHARED_PTR<GraspIt::GraspItSceneManager> graspitMgr(new GraspIt::GraspItSceneManagerHeadless());
 	while (ros::ok()) { 
 		if (objectReady && classReady && poseReady) {
@@ -180,41 +180,20 @@ int main(int argc, char **argv) {
 			    	gripperPose	= it->getObjectToHandTransform();
 			    	Eigen::Vector4d pos = relativeTf.col(3);
 			    	bool far = true;
-			    	for (unsigned index = 0; index < graspPose.size(); index++) {
-			    		if ( (graspPose[index].col(3) - pos).norm() < 80) { //by distance of hand center
-			    			far = false;
-			    			if (energy < energies[index]){ // choose best
-			    				graspPose[index] = relativeTf;
-			    				energies[index] = energy;
-			    				jointVals[index] = jointVal[0];
-			    				break;
-			    			}  
-			    		}
-			    	}
-			    	if(far){ 
-			    		graspPose.push_back(relativeTf);
-			    		energies.push_back(energy); // discreticize the pose
-			    		jointVals.push_back(jointVal[0]);	    		
-			    	}
+			  		Eigen::Quaterniond orientation =  Eigen::Quaterniond(gripperPose.rotation());
+					Eigen::Vector3d translation = gripperPose.translation();
+					geometry_msgs::Pose pose;
+					pose.position.x = gripperPose.translation()[0] / 1000;
+					pose.position.y = gripperPose.translation()[1] / 1000;
+					pose.position.z = gripperPose.translation()[2] / 1000;
+					pose.orientation.x = orientation.x();
+					pose.orientation.y = orientation.y();
+					pose.orientation.z = orientation.z();
+					pose.orientation.w = orientation.w();
+					output_msg.poses.push_back(pose);
+		    		graspPose.push_back(relativeTf);
 			    }
 			}
-			grasp_pose_file.open(file_name.c_str(), std::ofstream::app); 
-			for (unsigned index = 0; index < graspPose.size(); index++) {
-		    	if(energies[index] < 45.0)  { //skip the first one and threshold
-		    		grasp_pose_file << graspPose[index] << "," << jointVals[index] << 
-						 "," <<  energies[index] << "\n"; //for recovering finger joint and energy
-				}
-			}
-			geometry_msgs::Pose output_msg;
-			Eigen::Quaterniond orientation =  Eigen::Quaterniond(gripperPose.rotation());
-			Eigen::Vector3d translation = gripperPose.translation();
-			output_msg.position.x = gripperPose.translation()[0] / 1000;
-			output_msg.position.y = gripperPose.translation()[1] / 1000;
-			output_msg.position.z = gripperPose.translation()[2] / 1000;
-			output_msg.orientation.x = orientation.x();
-			output_msg.orientation.y = orientation.y();
-			output_msg.orientation.z = orientation.z();
-			output_msg.orientation.w = orientation.w();
 			grasp_pub.publish(output_msg); 
 			objectReady = false;
 			poseReady = false;
@@ -222,7 +201,6 @@ int main(int argc, char **argv) {
 			posePosition.clear();
 			poseOrientation.clear();
 			ros_clsData.clear();
-			grasp_pose_file.close();
 			repeated = true;
 		}
 		ros::spinOnce();

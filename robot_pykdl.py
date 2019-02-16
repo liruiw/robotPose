@@ -436,7 +436,7 @@ def main():
     image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
     seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
-    for index in range(50):
+    for index in range(10):
         file = sio.loadmat('sample_data/%06d-meta.mat'%(index % 5))
         arm_test_image = cv2.imread('sample_data/%06d-color.png'%(index % 5))
         if args.robot == 'panda_arm':  #correspond with move_arm
@@ -518,9 +518,7 @@ def main():
             print 'IK test ======================' 
             # ros quat xyzw | transforms3d wxyz
             _, joints = robot.gen_rand_pose(base_link)
-
             joints = deg2rad(joints[:7])
-            print joints
             p = robot.forward_position_kinematics(joint_values=np.array(joints))
             pos = p[0:3]
             rot = p[3:]
@@ -545,7 +543,6 @@ def main():
             p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
             print 'pos', p_[:3, 3], pos
             if joints is not None:
-                joints[4] -= np.pi
                 poses_p = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
                 poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
                 poses = []
