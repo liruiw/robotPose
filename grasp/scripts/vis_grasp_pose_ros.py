@@ -56,15 +56,13 @@ def get_best_grasp(pose, object_pose, joint_val):
 def example_call_back(pose_grasps):
 	global current_pose_grasp
 	current_pose_grasp = []
-	print 'len', len(pose_grasps.poses)
-	for pose_i in pose_grasps.poses:
+	for pose_i in pose_grasps.poses[-10:]: #avoid caching
 		current_pose_grasp.append(np.array([pose_i.position.x, pose_i.position.y, pose_i.position.z , \
 			pose_i.orientation.x, pose_i.orientation.y, pose_i.orientation.z, pose_i.orientation.w]))
-	print 'callback update', current_pose_grasp[0][:3]
 
 def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 	global num, mat_file
-	joint_val = 5 
+	finger_joint = 2 
 	image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 	seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 	obj_name = '_'.join(classes[target].split('_')[1:])
@@ -78,18 +76,20 @@ def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 		grasp_candidate = np.eye(4)
 		grasp_candidate[:3, :3] = quat2mat(quat)
 		grasp_candidate[:3, 3] = pose_grasp[:3]
-		print 'update?', grasp_candidate[:3, 3]
-		grasp_pose = get_best_grasp(grasp_candidate, object_pose[target_idx], joint_val)
-		grasp_candidate_r = grasp_pose[0].dot(np.linalg.inv(curr_base_pose))
+		
+		hand_pose = object_pose[target_idx].dot(grasp_candidate)
+		grasp_candidate_r = np.linalg.inv(curr_base_pose).dot(hand_pose)
+
 		pos = grasp_candidate_r[:3, 3]
 		rot = ros_quat(mat2quat(grasp_candidate_r[:3, :3]))
-		print pos, grasp_pose[0][:3, 3]
 		joints =  robot.inverse_kinematics(pos, rot)
-
+		grasp_pose = get_best_grasp(grasp_candidate, object_pose[target_idx], finger_joint)
 		if joints is not None:
 			break
-	
+		else:
+			print 'filter'
 	if joints is not None:
+		p = robot.forward_position_kinematics(joint_values=np.array(joints))
 		joints = rad2deg(joints)
 		arm_pose = robot.solve_poses_from_joint(joints, base_link='panda_link0', base_pose=curr_base_pose)
 		arm_pose = robot.offset_pose_center(arm_pose, dir='off', base_link='panda_link0')
@@ -152,7 +152,7 @@ def example_publish(curr_base_pose):
 				msg.position.z = pub_pose[i][2, 3]
 				msgs.poses.append(msg)
 			pose_pub.publish(msgs)
-		rate.sleep()
+			rate.sleep()
 
 if __name__ == '__main__':
 	height = 480
@@ -204,8 +204,9 @@ if __name__ == '__main__':
 	robot = robot_kinematics('panda_arm')
 	rospy.Subscriber('grasp_pose', PoseArray, example_call_back)
 	curr_base_pose = np.eye(4)
-	curr_base_pose[:3, 3] = np.array([0.2, 0.2, 0.5])
+	curr_base_pose[:3, 3] = np.array([0.5, 0.2, 0.8])
 	try:
 		example_publish(curr_base_pose)
+		rospy.spin()
 	except rospy.ROSInterruptException:
 		pass

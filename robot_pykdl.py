@@ -520,7 +520,7 @@ def main():
             _, joints = robot.gen_rand_pose(base_link)
             joints = deg2rad(joints[:7])
             p = robot.forward_position_kinematics(joint_values=np.array(joints))
-            pos = p[0:3]
+            pos = p[:3]
             rot = p[3:]
             print 'fk', joints, pos
             # read the current joints and input
@@ -538,12 +538,12 @@ def main():
             x = int(center[0])
             y = int(center[1])
             joints = rad2deg(joints)
-            joints_ = np.zeros(joints.shape[0] + 1)
+            joints_ = np.zeros(joints.shape[0] + 4)
             joints_[:joints.shape[0]] = joints       
-            p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
+            p_ = robot.solve_poses_from_joint(joints_[:-3], base_link, base_pose=np.eye(4))[-1]
             print 'pos', p_[:3, 3], pos
             if joints is not None:
-                poses_p = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
+                poses_p = robot.solve_poses_from_joint(np.array(joints_), base_link, base_pose=np.eye(4))
                 poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
                 poses = []
                 for i in range(len(poses_p)):
@@ -552,7 +552,7 @@ def main():
                     trans = pose_i[:3,3]
                     poses.append(np.hstack((trans,rot))) 
                 renderer.set_poses(poses)
-                renderer.render(range(len(joints)), image_tensor, seg_tensor)
+                renderer.render(range(joints_.shape[0]), image_tensor, seg_tensor)
                 image_tensor = image_tensor.flip(0)
                 seg_tensor = seg_tensor.flip(0)
 
