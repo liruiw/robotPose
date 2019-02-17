@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<world>
+	<graspableBody>
+		<filename>models/objects/sugar_box.xml</filename>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[+0 +0 +0]</fullTransform>
+		</transform>
+	</graspableBody>
+	<obstacle>
+		<filename>models/obstacles/dinner_table.xml</filename>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[-842.174 -446.331 -912.388]</fullTransform>
+		</transform>
+	</obstacle>
+	<robot>
+		<filename>models/robots/panda/panda.xml</filename>
+		<dofValues>+20 +20 </dofValues>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[-721.331 +60.6246 +7.49949e-05]</fullTransform>
+		</transform>
+	</robot>
+	<camera>
+		<position>-546.564 -3627.63 +437.174</position>
+		<orientation>+0.620811 +0.235433 -0.366364 +0.651876</orientation>
+		<focalDistance>+3694.53</focalDistance>
+	</camera>
+</world>

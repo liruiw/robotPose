@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<world>
+	<camera>
+		<position>-1189.51 -743.225 2925.71</position>
+		<orientation>-0.211696 0.215325 0.497448 -0.813244</orientation>
+		<focalDistance>2722.87</focalDistance>
+	</camera>
+</world>

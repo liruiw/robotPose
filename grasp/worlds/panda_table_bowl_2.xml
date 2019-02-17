@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<world>
+	<obstacle>
+		<filename>models/obstacles/dinner_table.xml</filename>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[-1964.97 +45.8188 -2385.72]</fullTransform>
+		</transform>
+	</obstacle>
+	<graspableBody>
+		<filename>models/objects/bowl.xml</filename>
+		<transform>
+			<fullTransform>(+9.63268e-05 +1 +0 +0)[-872.541 +480.717 -1535.17]</fullTransform>
+		</transform>
+	</graspableBody>
+	<robot>
+		<filename>models/robots/panda/panda.xml</filename>
+		<dofValues>+15.5184 +15.5184 </dofValues>
+		<transform>
+			<fullTransform>(+0.534895 +0.805274 -0.183676 +0.178001)[-639.832 -667.317 -875.774]</fullTransform>
+		</transform>
+	</robot>
+	<camera>
+		<position>-715.238 +4495.92 -674.571</position>
+		<orientation>+0.407224 -0.526493 -0.567483 -0.484702</orientation>
+		<focalDistance>+4441.07</focalDistance>
+	</camera>
+</world>

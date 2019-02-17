@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<world>
+	<obstacle>
+		<filename>models/obstacles/dinner_table.xml</filename>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[-1059.87 -503.024 -932.066]</fullTransform>
+		</transform>
+	</obstacle>
+	<graspableBody>
+		<filename>models/objects/bleach_cleanser.xml</filename>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[+0 +0 +0]</fullTransform>
+		</transform>
+	</graspableBody>
+	<robot>
+		<filename>models/robots/panda/panda.xml</filename>
+		<dofValues>+20 +20 </dofValues>
+		<transform>
+			<fullTransform>(+1 +0 +0 +0)[-678.935 +60.6246 +330.005]</fullTransform>
+		</transform>
+	</robot>
+	<camera>
+		<position>+30.6634 +3606.87 -799.42</position>
+		<orientation>-0.0720216 +0.776533 +0.622758 +0.063104</orientation>
+		<focalDistance>+3694.53</focalDistance>
+	</camera>
+</world>
