@@ -103,7 +103,6 @@ class robot_kinematics(object):
         self._ik_p_kdl = PyKDL.ChainIkSolverPos_NR(self._arm_chain, 
                                                     self._fk_p_kdl,
                                                     self._ik_v_kdl) 
-        #self._ik_p_kdl =  PyKDL.ChainIkSolverPos_LMA(self._arm_chain, _maxiter=1000)
         print 'robot name {} with base link {}'.format(self._name, self._base_link)
         print self._joint_name, self._joint_limits
         
