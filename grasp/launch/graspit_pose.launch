@@ -6,9 +6,9 @@
    <arg name="robot" default="panda"/>
    <arg name="object" default="5"/>
    <arg name="max_plan_iter" default="60000"/>
-   <arg name="max_plan_result" default="1"/>
-   <arg name="iter_count" default="1"/>
-   <arg name="mat_file" default="/home/liruiw/Projects/grasp/src/graspit_pose/script/YCB_Video/data/0040/000001-meta.mat" />
+   <arg name="max_plan_result" default="5"/>
+   <arg name="iter_count" default="5"/>
+   <arg name="mat_file" default="/capri/YCB_Video_Dataset/data/0040/000001-meta.mat" />
     <node name="graspit_pose" pkg="graspit_pose" type="graspit_pose" respawn="false" required="true"
       args="$(arg output_dir) $(arg world) $(arg max_plan_iter)  $(arg max_plan_result) $(arg default_dir) $(arg object) $(arg robot) $(arg iter_count) $(arg mat_file)"
       output="screen">
