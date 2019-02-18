@@ -4,9 +4,13 @@ import numpy as np
 import re
 import sys
 from shutil import copyfile
+import os
+
 holder = []
 scale_flag = False
 model_path = sys.argv[1]
+obj = [name for name in os.listdir('models') if name.endswith(model_path)][0]
+os.system('meshlabserver -i models/{}/textured_simple.obj -o mesh/{}.wrl'.format(obj, model_path))
 with open("mesh/{}.wrl".format(model_path), "rb") as vrml, open("mesh/{}_new.wrl".format(model_path), "w+") as vrml2:
 	for lines in vrml:
 		line = lines.strip()
@@ -26,10 +30,9 @@ with open("mesh/{}.wrl".format(model_path), "rb") as vrml, open("mesh/{}_new.wrl
 				scale_flag = False
 			vrml2.write(lines)
 
-holder_array = np.array(holder) #if you want numpy array
+holder_array = np.array(holder) 
 print holder_array.shape
 
-#3D Plotting
 # x,y,z = zip(*holder)
 # fig = plt.figure()
 # ax = Axes3D(fig)

@@ -6,14 +6,16 @@ robot_name = sys.argv[1]
 
 if robot_name == 'panda_arm':
 	models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'link8', 'hand', 'finger', 'finger', 'camera']
-elif robot_name == 'baxter':
-	models = ['dummy1', 'dummy2','S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
+elif robot_name == 'baxter': # two empty links
+	models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2', 'right_hand',  'right_gripper', 'electric_gripper_base', 'extended_narrow', 'extended_narrow']
 obj_paths = [
-	'{}_models/{}.DAE'.format(robot_name,item) for item in models]
-model_filename = '{}_models/models.txt'.format(robot_name)
-extent_filename = '{}_models/extents.txt'.format(robot_name)
-offset_filename = '{}_models/center_offset.txt'.format(robot_name)
-
+	'../{}_models/{}.DAE'.format(robot_name,item) for item in models]
+model_filename = '../{}_models/models.txt'.format(robot_name)
+extent_filename = '../{}_models/extents.txt'.format(robot_name)
+offset_filename = '../{}_models/center_offset.txt'.format(robot_name)
+extent_f = open(extent_filename, "w") #continue writing
+offset_f = open(offset_filename, "w")
+model_f = open(model_filename, "w")
 def homotrans(M, p):
     p = np.asarray(p)
     if p.shape[-1] == M.shape[1] - 1:
@@ -33,10 +35,8 @@ def recursive_load(node, vertices):
 
 for i, path in enumerate(obj_paths):
 	if not os.path.exists(path):
-		f = open(offset_filename, "a+")#dummy for empty link
-		f.write('%f %f %f\n'%(0,0,0))
-		f = open(model_filename, "a+")
-		f.write("{}\n".format(path[3:]))
+		offset_f.write('%f %f %f\n'%(0,0,0))
+		model_f.write("{}\n".format(path[3:]))
 		continue
 	scene = load(path)
 	pts =  np.zeros(3000, dtype=np.float32)
@@ -50,11 +50,8 @@ for i, path in enumerate(obj_paths):
 	print 'range', np.max(vertices,axis=0),np.min(vertices,axis=0)
 	print xyz.shape
 	print extent
-	f = open(extent_filename, "a+") #continue writing
-	f.write('%f %f %f\n'%(extent[0],extent[1],extent[2]))
-	f = open(offset_filename, "a+")
-	f.write('%f %f %f\n'%(center[0],center[1],center[2]))
-	f = open(model_filename, "a+")
-	f.write("{}\n".format(path[3:]))
-	xyz_file = '{}_models/{}.xyz'.format(robot_name,models[i])
+	extent_f.write('%f %f %f\n'%(extent[0],extent[1],extent[2]))
+	offset_f.write('%f %f %f\n'%(center[0],center[1],center[2]))
+	model_f.write("{}\n".format(path[3:]))
+	xyz_file = '../{}_models/{}.xyz'.format(robot_name,models[i])
 	np.savetxt(xyz_file, xyz, fmt="%f")

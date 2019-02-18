@@ -99,27 +99,27 @@ def main():
             print'fixed joint name: {}, parent :{}, child: {}'.format(\
                 joint.name, joint.parent, joint.child)
     print "URDF non-fixed joints: %d;" % num_non_fixed_joints,
-    tree, _ = kdl_tree_from_urdf_model(robot)
+    tree, ef = kdl_tree_from_urdf_model(robot)
     print "KDL joints: %d" % tree.getNrOfJoints()
     print "Segments: %d" % tree.getNrOfSegments()
     import random
     base_link = robot.get_root()
     end_link = robot.link_map.keys()[len(robot.links)-1]
     chain = tree.getChain(base_link, end_link)
-    # print tree.getNrOfSegments(), robot.link_map.keys()
-    if args.file.name.split('_')[0] == 'panda':
-        chain = tree.getChain(base_link, 'panda_rightfinger')
-    for idx in xrange(chain.getNrOfSegments() - 1):
-        segment = chain.getSegment(idx)
-        print segment.getName()
-        print segment.getJoint().getName() #, 'initial pose: '
-        print segment.getFrameToTip()
-        print segment.getJoint().JointAxis()
-        #print segment.pose(0) #fix joint won't change with joint angle 
-    print 'left right finger'
-    print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
-    print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
-    print tree.getChain('panda_hand', 'panda_hand_camera').getSegment(0).pose(0.04)
-    print "Root link: %s; Random end link: %s" % (base_link, end_link)
+    print ef
+    # if args.file.name.split('_')[0] == 'panda':
+    #     chain = tree.getChain(base_link, 'panda_rightfinger')
+    #     for idx in xrange(chain.getNrOfSegments() - 1):
+    #         segment = chain.getSegment(idx)
+    #         print segment.getName()
+    #         print segment.getJoint().getName() #, 'initial pose: '
+    #         print segment.getFrameToTip()
+    #         print segment.getJoint().JointAxis()
+    #         #print segment.pose(0) #fix joint won't change with joint angle 
+    #         print 'left right finger'
+    #         print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
+    #         print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
+    #         print tree.getChain('panda_hand', 'panda_hand_camera').getSegment(0).pose(0.04)
+    #         print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()

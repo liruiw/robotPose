@@ -6,3 +6,8 @@
 *.obj
 *.mtl
 test_image
+grasp/scripts/panda_arm_models
+grasp/scripts/output
+grasp/scripts/models
+grasp/scripts/ycb_render
+grasp/scripts/YCB_Video

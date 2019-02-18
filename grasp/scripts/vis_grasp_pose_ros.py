@@ -41,15 +41,14 @@ def mkdir_if_missing(dst_dir):
 	if not os.path.exists(dst_dir):
 		os.makedirs(dst_dir)
 
-def get_best_grasp(pose, object_pose, joint_val):
+def get_grasp_scene(pose, object_pose, joint_val):
 	pose_scene = [object_pose.dot(pose)] #gripper -> object
-	joint = max(min((20 + joint_val)/1000, 0.04), 0) #from eigen.xml
+	joint = max(min((20 + joint_val)/1000, 0.04), 0) 
 	joint *= 180 / np.pi
 	joint = np.array([joint, joint, joint]) 
 	finger_poses = robot.solve_poses_from_joint(joint, 'panda_hand', pose_scene[0])
 	pose_scene += finger_poses
 	pose_scene = robot.offset_pose_center(pose_scene, dir='off', base_link='panda_link7') #offset hand as well
-	contact_pos = (pose_scene[2] + pose_scene[3])[2, 3]/2 #two fingers
 	return pose_scene
 
 
@@ -60,7 +59,7 @@ def example_call_back(pose_grasps):
 		current_pose_grasp.append(np.array([pose_i.position.x, pose_i.position.y, pose_i.position.z , \
 			pose_i.orientation.x, pose_i.orientation.y, pose_i.orientation.z, pose_i.orientation.w]))
 
-def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
+def render_pose(curr_base_pose, poses):
 	global num, mat_file
 	finger_joint = 2 
 	image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
@@ -70,7 +69,6 @@ def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 	joints = []
 	
 	mkdir_if_missing('test_image/%s' % obj_name)
-		
 	for pose_grasp in poses:
 		quat = tf_quat(pose_grasp[3:])
 		grasp_candidate = np.eye(4)
@@ -83,7 +81,7 @@ def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 		pos = grasp_candidate_r[:3, 3]
 		rot = ros_quat(mat2quat(grasp_candidate_r[:3, :3]))
 		joints =  robot.inverse_kinematics(pos, rot)
-		grasp_pose = get_best_grasp(grasp_candidate, object_pose[target_idx], finger_joint)
+		grasp_pose = get_grasp_scene(grasp_candidate, object_pose[target_idx], finger_joint)
 		if joints is not None:
 			break
 		else:
@@ -94,7 +92,7 @@ def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 		arm_pose = robot.solve_poses_from_joint(joints, base_link='panda_link0', base_pose=curr_base_pose)
 		arm_pose = robot.offset_pose_center(arm_pose, dir='off', base_link='panda_link0')
 		
-		pose_scene = arm_pose + grasp_pose + object_pose #may choose the worst one if none passes
+		pose_scene = arm_pose + grasp_pose + object_pose # construct all poses
 		poses = []
 		for i in range(len(pose_scene)):
 			tf = pose_scene[i]
@@ -120,13 +118,13 @@ def render_pose(curr_base_pose, poses): #maybe current base pose isjust identity
 	
 # ros
 def example_publish(curr_base_pose):
-	global mat_poses, num, current_pose_grasp
+	global mat_poses, num, current_pose_grasp, object_pose
 	while not rospy.is_shutdown():
 		if current_pose_grasp is not None:
 			render_pose(curr_base_pose, current_pose_grasp)	
 			current_pose_grasp = None
 		else:
-			pub_pose = []
+			object_pose = []
 			mat_file = 'YCB_Video/data/{}/{:06d}-meta.mat'.format(video, num)
 			mat = sio.loadmat(mat_file)
 			mat_poses = mat['poses']
@@ -134,7 +132,7 @@ def example_publish(curr_base_pose):
 			for i, cls in enumerate(cls_indexes):
 				pose = np.eye(4)
 				pose[:3, :4] = mat_poses[:, :, i]
-				pub_pose.append(pose.copy())
+				object_pose.append(pose.copy())
 			class_msg = Int32MultiArray()
 			class_msg.data = cls_indexes
 			classes_pub.publish(class_msg)
@@ -142,26 +140,26 @@ def example_publish(curr_base_pose):
 			msgs = PoseArray()
 			for i in range(cls_indexes.shape[0]):
 				msg = Pose()
-				quat = mat2quat(pub_pose[i][:3, :3])
+				quat = mat2quat(object_pose[i][:3, :3])
 				msg.orientation.x = quat[1]
 				msg.orientation.y = quat[2]
 				msg.orientation.z = quat[3]
 				msg.orientation.w = quat[0]
-				msg.position.x = pub_pose[i][0, 3]
-				msg.position.y = pub_pose[i][1, 3]
-				msg.position.z = pub_pose[i][2, 3]
+				msg.position.x = object_pose[i][0, 3]
+				msg.position.y = object_pose[i][1, 3]
+				msg.position.z = object_pose[i][2, 3]
 				msgs.poses.append(msg)
-			pose_pub.publish(msgs)
+			pose_pub.publish(msgs) #publish posearray
 			rate.sleep()
 
 if __name__ == '__main__':
 	height = 480
 	width = 640
-	video = sys.argv[1] #/home/liruiw/Projects/grasp/src/graspit_pose/script/YCB_Video/data/0040/000001-meta.mat
+	video = sys.argv[1]
 	num = 1
 	current_pose_grasp = None
 	pose_flag = False
-	target = int(sys.argv[2]) #5
+	target = int(sys.argv[2]) 
 	classes = ('__background__', '002_master_chef_can', '003_cracker_box', '004_sugar_box', '005_tomato_soup_can', '006_mustard_bottle', \
 							 '007_tuna_fish_can', '008_pudding_box', '009_gelatin_box', '010_potted_meat_can', '011_banana', '019_pitcher_base', \
 							 '021_bleach_cleanser', '024_bowl', '025_mug', '035_power_drill', '036_wood_block', '037_scissors', '040_large_marker', \
@@ -200,11 +198,12 @@ if __name__ == '__main__':
 	renderer.set_camera_default()
 	renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
 	renderer.set_camera_default()
-	renderer.set_light_pos(np.random.uniform(-0.5, 0.5, 3))
+	renderer.set_light_pos(np.random.uniform(-0.5, 0.5, 3)) #random position for robot base
 	robot = robot_kinematics('panda_arm')
 	rospy.Subscriber('grasp_pose', PoseArray, example_call_back)
-	curr_base_pose = np.eye(4)
-	curr_base_pose[:3, 3] = np.array([0.5, 0.2, 0.8])
+	curr_base_pose =  np.eye(4)
+	curr_base_pose[:3, :] =  mat_poses[:, :, target]
+	curr_base_pose[:3, 3] += np.array([-0.8, 0.2, 0.5])
 	try:
 		example_publish(curr_base_pose)
 		rospy.spin()
