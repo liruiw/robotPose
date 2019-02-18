@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
             for(int i = 0; i<posePosition.size(); ++i)
             {
                 poseMatrix = Eigen::Matrix4d::Identity();
-                if((int)ros_clsData[i] == object){ //assume only one, find its pose
+                if((int)ros_clsData[i] == object){ //anchor pose
                     targetPose = GraspIt::EigenTransform();
                     targetPose.translate(posePosition[i]);
                     targetPose.rotate(poseOrientation[i]);
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
                 Eigen::Matrix4d poseMatrix = Eigen::Matrix4d::Identity();        
                 std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
                 objectFileList.push_back(objectFilename);
-                if((int)ros_clsData[i] != object){
+                if((int)ros_clsData[i] != object){ // wrt the anchor
                     GraspIt::EigenTransform relativePose = targetPose.inverse();
                     relativePose.translate(posePosition[i]);
                     relativePose.rotate(poseOrientation[i]);
@@ -126,12 +126,12 @@ int main(int argc, char **argv) {
             std::vector<double> energies;
             graspPose.push_back(Eigen::Matrix4d::Identity());
             energies.push_back(100.0);
-            jointVals.push_back(0.0); //dummies
+            jointVals.push_back(0.0); 
             Eigen::Matrix4d relativeTf;
             GraspIt::EigenTransform gripperPose;
             for (int i = 0; i < iter_count; i++) {
                 
-                float scale = dgauss(500, 200);; //sphere radius
+                float scale = dgauss(500, 200);
                 float x = dgauss(0, 1);  float y = dgauss(0, 1); float z = dgauss(0, 1);
                 float r = sqrt(x*x + y*y + z*z);
                 x = x / r * scale; y = y / r * scale; z = z / r * scale;
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
                     geometry_msgs::Pose pose;
                     pose.position.x = gripperPose.translation()[0] / 1000;
                     pose.position.y = gripperPose.translation()[1] / 1000;
-                    pose.position.z = gripperPose.translation()[2] / 1000;
+                    pose.position.z = gripperPose.translation()[2] / 1000; //scale translation
                     pose.orientation.x = orientation.x();
                     pose.orientation.y = orientation.y();
                     pose.orientation.z = orientation.z();

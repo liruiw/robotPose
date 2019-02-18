@@ -198,12 +198,12 @@ if __name__ == '__main__':
 	renderer.set_camera_default()
 	renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
 	renderer.set_camera_default()
-	renderer.set_light_pos(np.random.uniform(-0.5, 0.5, 3)) #random position for robot base
+	renderer.set_light_pos(np.random.uniform(-0.5, 0.5, 3)) 
 	robot = robot_kinematics('panda_arm')
 	rospy.Subscriber('grasp_pose', PoseArray, example_call_back)
 	curr_base_pose =  np.eye(4)
-	curr_base_pose[:3, :] =  mat_poses[:, :, target]
-	curr_base_pose[:3, 3] += np.array([-0.8, 0.2, 0.5])
+	curr_base_pose[:3, :] =  mat_poses[:, :, target_idx]
+	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.5]) #fixed position for robot base
 	try:
 		example_publish(curr_base_pose)
 		rospy.spin()
