@@ -16,7 +16,7 @@ int main(int argc, char **argv)
 	
   // The world file name will be the first argument
   std::string output_dir, default_dir, mat_file;
-  std::string world, robot;
+  std::string world, robot, frame;
   int max_plan_iter, iter_count, max_plan_result;
 
   //load all ros param
@@ -27,6 +27,7 @@ int main(int argc, char **argv)
 
   nh.getParam("default_dir", default_dir);
   nh.getParam("world", world);
+  nh.getParam("frame", frame);
   nh.getParam("output_dir", output_dir);
   nh.getParam("max_plan_iter", max_plan_iter);
   nh.getParam("robot", robot);
@@ -59,7 +60,7 @@ int main(int argc, char **argv)
 
     // look for object poses
     tf::StampedTransform transform;
-    std::string target_frame = "00_base_link";
+    std::string target_frame = frame;
     ros_clsData.clear();
     posePosition.clear();
     poseOrientation.clear();

@@ -1,6 +1,7 @@
 <launch>
    <arg name="output_dir" default="$(env GRASPIT)/output"/>
    <arg name="default_dir" default="$(env GRASPIT)"/>
+   <arg name="frame" default="camera_depth_optical_frame"/>
    <arg name="world" default="empty"/>
    <arg name="robot" default="panda"/>
    <arg name="max_plan_iter" default="60000"/>
@@ -13,6 +14,7 @@
       <param name="output_dir" value="$(arg output_dir)"/>
       <param name="default_dir" value="$(arg default_dir)"/>
       <param name="world" value="$(arg world)"/>
+      <param name="frame" value="$(arg frame)"/>
       <param name="robot" value="$(arg robot)"/>
       <param name="max_plan_iter" value="$(arg max_plan_iter)"/>
       <param name="max_plan_result" value="$(arg max_plan_result)"/>
