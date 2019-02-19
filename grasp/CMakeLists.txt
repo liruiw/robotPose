@@ -8,7 +8,7 @@ add_compile_options(-std=c++11)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  grasp_planning_graspit roscpp geometry_msgs genmsg message_generation
+  grasp_planning_graspit roscpp tf geometry_msgs genmsg message_generation
 )
 find_package(MATIO REQUIRED)
 ## System dependencies are found with CMake's conventions
@@ -136,6 +136,8 @@ add_executable(graspit_pose
     src/planning.cpp)
 add_executable(graspit_planning_node
     src/planning_ros.cpp)
+add_executable(graspit_planning_isaac
+    src/planning_ros_isaac.cpp)
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
 ## target back to the shorter version for ease of user use
@@ -150,6 +152,8 @@ add_executable(graspit_planning_node
 target_link_libraries(graspit_pose
     ${catkin_LIBRARIES}   ${MATIO_LIBRARIES})
 target_link_libraries(graspit_planning_node
+    ${catkin_LIBRARIES} )
+target_link_libraries(graspit_planning_isaac
     ${catkin_LIBRARIES} )
 
 #############

@@ -3,7 +3,10 @@
 #include <grasp_planning_graspit/EigenGraspResult.h>
 #include <grasp_planning_graspit/GraspItHelpers.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
 #include <ros/ros.h>
+#include <tf/transform_listener.h>
 #include <iostream>
 #include <fstream>
 #include <random>
