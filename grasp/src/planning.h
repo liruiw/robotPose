@@ -36,3 +36,5 @@ bool objectReady;
 bool repeated = false;
 std::vector<Eigen::Vector3d> posePosition;
 std::vector<Eigen::Quaterniond> poseOrientation;
+Eigen::Vector3d gripperPosition;
+Eigen::Quaterniond gripperOrientation;

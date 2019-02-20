@@ -230,7 +230,7 @@ int main(int argc, char **argv)
           gripperPose = it->getObjectToHandTransform();
           Eigen::Vector4d pos = relativeTf.col(3);
           bool far = true;
-	  Eigen::Quaterniond orientation =  Eigen::Quaterniond(gripperPose.rotation());
+	        Eigen::Quaterniond orientation =  Eigen::Quaterniond(gripperPose.rotation());
           Eigen::Vector3d translation = gripperPose.translation();
 
           geometry_msgs::Pose pose;

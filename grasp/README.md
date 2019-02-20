@@ -18,3 +18,4 @@ Mainly, test the communication between planner and pose detection by
 python vis_grasp_pose_ros.py 0040 5
 roslaunch graspit_pose graspit_pose_ros.launch
 ```
+Note: make sure you make install graspit again since we modify its source code.
