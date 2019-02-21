@@ -170,7 +170,6 @@ def example_publish(curr_base_pose):
 				msgs.poses.append(msg)
 			pose_pub.publish(msgs) #publish posearray
 			
-			msgs = PoseArray()
 			msg = Pose() #publish initial gripper pose
 			quat = mat2quat(gripperPose[:3, :3])
 			msg.orientation.x = quat[1]
@@ -180,19 +179,7 @@ def example_publish(curr_base_pose):
 			msg.position.x = gripperPose[0, 3]
 			msg.position.y = gripperPose[1, 3]
 			msg.position.z = gripperPose[2, 3]
-			msgs.poses.append(msg)
-
-			msg = Pose() #publish initial gripper pose
-			quat = mat2quat(curr_base_pose[:3, :3])
-			msg.orientation.x = quat[1]
-			msg.orientation.y = quat[2]
-			msg.orientation.z = quat[3]
-			msg.orientation.w = quat[0]
-			msg.position.x = curr_base_pose[0, 3]
-			msg.position.y = curr_base_pose[1, 3]
-			msg.position.z = curr_base_pose[2, 3]
-			msgs.poses.append(msg)
-			robot_pub.publish(msgs)			
+			robot_pub.publish(msg)			
 			rate.sleep()
 
 if __name__ == '__main__':
@@ -236,7 +223,7 @@ if __name__ == '__main__':
 	pose_pub = rospy.Publisher('object_poses', PoseArray, queue_size=1) #add prefix
 	target_pub = rospy.Publisher('grasp_target', Int32, queue_size=1)
 	classes_pub = rospy.Publisher('grasp_classes', Int32MultiArray, queue_size=1)
-	robot_pub = rospy.Publisher('robot_pose', PoseArray, queue_size=1)
+	robot_pub = rospy.Publisher('robot_pose', Pose, queue_size=1)
 	renderer = YCBRenderer(width=width, height=height, render_marker=False, robot='panda_arm')
 	renderer.load_objects(obj_paths, texture_paths, colors)
 	renderer.set_camera_default()
@@ -249,7 +236,7 @@ if __name__ == '__main__':
 	#curr_base_pose[:3, :] = mat_poses[:, :, target_idx] 
 	curr_base_pose = rotY(-np.pi/2).dot(rotX(-np.pi/2).dot(curr_base_pose)) # switch rotation axes
 	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.7]).reshape([3, 1]) #fixed position for robot base
-	gripperPose = robot.solve_poses_from_joint(np.zeros(11), 'panda_link0')[-1]
+	gripperPose = robot.solve_poses_from_joint(np.ones(11), 'panda_link0')[-1]
 
 	try:
 		example_publish(curr_base_pose)

@@ -8,6 +8,14 @@ float dgauss(float mean, float stdDev)
   return normal(rand_gen);
 }
 
+GraspIt::EigenTransform transf(Eigen::Quaterniond quat, Eigen::Vector3d translation) {
+  GraspIt::EigenTransform Pose;
+  Pose.setIdentity();
+  Pose.translate(translation);
+  Pose.rotate(quat);
+  return Pose;
+}
+
 int main(int argc, char **argv) 
 {
 
@@ -35,8 +43,9 @@ int main(int argc, char **argv)
   nh.getParam("max_plan_result", max_plan_result);
   nh.getParam("mat_file", mat_file);
   std::cout << robot << std::endl;
-  std::string worldFilename(default_dir + "/worlds/" + world + ".xml");
+  std::string worldFilename(default_dir + "/worlds/empty.xml");
   std::string robotFilename(default_dir + "/models/robots/" + robot + "/" + robot + ".xml");
+  std::string tableFilename(default_dir + "/models/obstacles/dinner_table.xml");
 
   bool obstacle = true;
   bool createDir = true;
@@ -62,14 +71,13 @@ int main(int argc, char **argv)
     tf::StampedTransform transform;
     std::string target_frame = frame;
     ros_clsData.clear();
-    posePosition.clear();
-    poseOrientation.clear();
+    objectPoses.clear();
     output_msg.poses.clear();
 
     for (int i = 1; i < YCB_classes.size(); i++)
     {
       std::string source_frame = "00_" + YCB_classes[i];
-
+       // add listen to gripper and table pose
       try
       {
         listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
@@ -77,11 +85,11 @@ int main(int argc, char **argv)
 
         // rotation
         tf::Quaternion tfQuat = transform.getRotation();
-        poseOrientation.push_back(Eigen::Quaterniond(tfQuat.w(), tfQuat.x(), tfQuat.y(), tfQuat.z()));
 
         // translation
         tf::Vector3 tfVec = transform.getOrigin();
-        posePosition.push_back(Eigen::Vector3d(tfVec.getX() * 1000, tfVec.getY() * 1000, tfVec.getZ() * 1000));
+        objectPoses.push_back(transf(Eigen::Quaterniond(tfQuat.w(), tfQuat.x(), tfQuat.y(), tfQuat.z()),
+          Eigen::Vector3d(tfVec.getX() * 1000, tfVec.getY() * 1000, tfVec.getZ() * 1000)));
       }
       catch (tf::TransformException ex)
       {
@@ -96,11 +104,7 @@ int main(int argc, char **argv)
       for (int i = 0; i < ros_clsData.size(); i++)
       {
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
-        std::cout << "Rotation: " << poseOrientation[i].w() << " " 
-                                  << poseOrientation[i].x() << " " 
-                                  << poseOrientation[i].y() << " "
-                                  << poseOrientation[i].z() << " " << std::endl;
-        std::cout << "Translation: " << posePosition[i][0] << " " << posePosition[i][1] << " " << posePosition[i][2] << std::endl;
+        std::cout << "TF: " << objectPoses[i] << " "  << std::endl;
       }
 
       // std::cout << "press enter to exit...";
@@ -116,83 +120,55 @@ int main(int argc, char **argv)
       object = ros_clsData[0];
 
       // Load the graspit world
-      std::string tableworldFilename(default_dir + "/worlds/panda_table_" + YCB_classes[object] + ".xml");
-      std::cout << "start " << tableworldFilename << std::endl;
       std::string file_name = outputDirectory + "/" + YCB_classes[object] + "_grasp_pose.txt";
       std::cout << file_name << std::endl;
       std::string initial_world_iv, initial_world_xml;
 
       // so that we can run multiple times for one configuration
       if(!repeated) 
-        graspitMgr->loadWorld(tableworldFilename); //load the world with anchor
+        graspitMgr->loadWorld(worldFilename); //load the world with anchor
 
       std::vector<GraspIt::EigenTransform> objectTransformList;
       std::vector<std::string> objectFileList;
       Eigen::Matrix4d poseMatrix; 	
-			
-      for(int i = 0; i < posePosition.size(); ++i)
-      {
-        poseMatrix = Eigen::Matrix4d::Identity();
-        // assume only one, find its pose
-        if((int)ros_clsData[i] == object)
-        { 
-          targetPose.setIdentity();
-          targetPose.translate(posePosition[i]);
-          targetPose.rotate(poseOrientation[i]);
-        }
-      }
 
-      for(int i = 0; i < posePosition.size(); ++i)
+      // load objects
+      for(int i = 0; i < objectPoses.size(); ++i)
       {
-        Eigen::Matrix4d poseMatrix = Eigen::Matrix4d::Identity();	    
         std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
-        objectFileList.push_back(objectFilename);
-
-        if((int)ros_clsData[i] != object)
-        {
-          GraspIt::EigenTransform relativePose = targetPose.inverse();
-          relativePose.translate(posePosition[i]);
-          relativePose.rotate(poseOrientation[i]);
-          objectTransformList.push_back(relativePose);
-
-          if(!repeated) 
-            graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], false, relativePose); //place as occluder
-          else
-            graspitMgr->moveObject(YCB_classes[ros_clsData[i]], relativePose);					
+        bool graspable = false;
+        if((int)ros_clsData[i] == object) { 
+          graspable = true;
         }
+        if(!repeated) {          
+          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
+        }
+        else {
+          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
+        }     
       }
 
-      Eigen::Vector3d gripperPos;
-      std::vector<Eigen::Matrix4d> graspPose;
-      std::vector<double> jointVals;
-      std::vector<double> energies;
-      graspPose.push_back(Eigen::Matrix4d::Identity());
-      energies.push_back(100.0);
-      jointVals.push_back(0.0); //dummies
-      Eigen::Matrix4d relativeTf;
+      //load gripper
+      if(!repeated) {          
+        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); //place as occluder
+      }
+      else {
+        graspitMgr->moveRobot(robot, gripperInitialPose); //ignore collsion, add switch?
+      } 
+
+      //load table
+      if(!repeated) {          
+        graspitMgr->loadObject(tableFilename, "dinner_table", false, tablePose); //place as occluder
+      }
+      else {
+        graspitMgr->moveObject("dinner_table", tablePose); //ignore collsion, add switch?
+      } 
+
       GraspIt::EigenTransform gripperPose;
 
       for (int i = 0; i < iter_count; i++) 
       {
 				
-        float scale = dgauss(500, 200); //sphere radius
-        float x = dgauss(0, 1);
-        float y = dgauss(0, 1);
-        float z = dgauss(0, 1);
-        float r = sqrt(x*x + y*y + z*z);
-        x = x / r * scale;
-        y = y / r * scale;
-        z = z / r * scale;
-
-        gripperPos = Eigen::Vector3d(x, y, z);
-        robotTransform.setIdentity();
-        Eigen::Quaterniond quaternion(dgauss(0, 1), dgauss(0, 1), dgauss(0, 1), dgauss(0, 1));
-
-        // random initial rotation or might take in as input
-        robotTransform.rotate(quaternion);
-        robotTransform.translate(gripperPos); 
-        graspitMgr->moveRobot(robot, robotTransform); 
-        graspitMgr->moveObject(YCB_classes[object], objectTransform); 
         graspitMgr->saveGraspItWorld(outputDirectory + "/worlds/startWorld_"  + std::to_string(i + 1) +  ".xml", createDir);
         graspitMgr->saveInventorWorld(outputDirectory + "/worlds/startWorld_" + std::to_string(i + 1) +  ".iv", createDir);
         std::cout << outputDirectory + "/worlds/startWorld_" << std::endl;
@@ -226,23 +202,19 @@ int main(int argc, char **argv)
           std::cout << *it << std::endl;
           double energy = it->getEnergy();
           std::vector<double> jointVal = it->getEigenGraspValues();
-          relativeTf = it->getObjectToHandTransform().matrix();
           gripperPose = it->getObjectToHandTransform();
-          Eigen::Vector4d pos = relativeTf.col(3);
-          bool far = true;
 	        Eigen::Quaterniond orientation =  Eigen::Quaterniond(gripperPose.rotation());
           Eigen::Vector3d translation = gripperPose.translation();
 
           geometry_msgs::Pose pose;
-          pose.position.x = gripperPose.translation()[0] / 1000;
-          pose.position.y = gripperPose.translation()[1] / 1000;
-          pose.position.z = gripperPose.translation()[2] / 1000;
+          pose.position.x = translation[0] / 1000;
+          pose.position.y = translation[1] / 1000;
+          pose.position.z = translation[2] / 1000;
           pose.orientation.x = orientation.x();
           pose.orientation.y = orientation.y();
           pose.orientation.z = orientation.z();
           pose.orientation.w = orientation.w();
           output_msg.poses.push_back(pose);
-          graspPose.push_back(relativeTf);
         }
       }
 
