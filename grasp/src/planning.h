@@ -37,6 +37,6 @@ bool objectReady;
 bool gripperPoseReady;
 bool repeated = false;
 std::vector<GraspIt::EigenTransform> objectPoses;
-
+// table offset [-894.329 -509.39 -820.374]
 GraspIt::EigenTransform gripperInitialPose;
 GraspIt::EigenTransform tablePose;

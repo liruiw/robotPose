@@ -103,37 +103,37 @@ int main(int argc, char **argv) {
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
         std::cout << "TF: " << objectPoses[i] << " "  << std::endl;
       }
-      std::cout << "Table TF: " <<tablePose << " "  << std::endl;
-      std::cout << "gripper TF: " <<gripperInitialPose << " "  << std::endl;
+      std::cout << "Table TF: " << tablePose << " "  << std::endl;
+      std::cout << "gripper TF: " << gripperInitialPose << " "  << std::endl;
       std::string initial_world_iv, initial_world_xml;
       if(!repeated) { 
         //so that we can run multiple times for one configuration
         graspitMgr->loadWorld(worldFilename); //load the world with anchor  
       }  
 
-      // load objects
-      for(int i = 0; i < objectPoses.size(); ++i)
-      {
-        std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
-        bool graspable = false;
-        if((int)ros_clsData[i] == object) { 
-          graspable = true;
-        }
-        if(!repeated) {          
-          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
-        }
-        else {
-          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
-        }     
-      }
-
       //load gripper
       if(!repeated) {          
-        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); //place as occluder
+        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); 
       }
       else {
         graspitMgr->moveRobot(robot, gripperInitialPose); //ignore collsion, add switch?
       } 
+
+      // load objects
+      for(int i = 0; i < objectPoses.size(); ++i)
+      {
+        std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
+        bool graspable = true;
+        if(!graspitMgr->isObjectLoaded(YCB_classes[ros_clsData[i]])) {          
+          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
+        }
+        else {
+          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
+        }    
+        if((int)ros_clsData[i] == object) { 
+          graspitMgr->setCurrentGraspableObject(YCB_classes[ros_clsData[i]]);
+        }
+      }
 
       //load table
       if(!repeated) {          
