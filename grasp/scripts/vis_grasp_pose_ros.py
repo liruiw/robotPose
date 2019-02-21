@@ -86,6 +86,7 @@ def render_pose(curr_base_pose, poses):
 			break
 		else:
 			print 'filter'
+	
 	if joints is not None:
 		p = robot.forward_position_kinematics(joint_values=np.array(joints))
 		joints = rad2deg(joints)
@@ -118,7 +119,7 @@ def render_pose(curr_base_pose, poses):
 	
 # ros
 def example_publish(curr_base_pose):
-	global mat_poses, num, current_pose_grasp, object_pose
+	global mat_poses, num, current_pose_grasp, object_pose, gripperPose
 	while not rospy.is_shutdown():
 		if current_pose_grasp is not None:
 			render_pose(curr_base_pose, current_pose_grasp)	
@@ -137,6 +138,7 @@ def example_publish(curr_base_pose):
 			class_msg.data = cls_indexes
 			classes_pub.publish(class_msg)
 			target_pub.publish(target)
+			
 			msgs = PoseArray()
 			for i in range(cls_indexes.shape[0]):
 				msg = Pose()
@@ -150,6 +152,8 @@ def example_publish(curr_base_pose):
 				msg.position.z = object_pose[i][2, 3]
 				msgs.poses.append(msg)
 			pose_pub.publish(msgs) #publish posearray
+			
+			msgs = PoseArray()
 			msg = Pose() #publish initial gripper pose
 			quat = mat2quat(gripperPose[:3, :3])
 			msg.orientation.x = quat[1]
@@ -159,7 +163,19 @@ def example_publish(curr_base_pose):
 			msg.position.x = gripperPose[0, 3]
 			msg.position.y = gripperPose[1, 3]
 			msg.position.z = gripperPose[2, 3]
-			gripper_pub.publish(msg)			
+			msgs.poses.append(msg)
+
+			msg = Pose() #publish initial gripper pose
+			quat = mat2quat(curr_base_pose[:3, :3])
+			msg.orientation.x = quat[1]
+			msg.orientation.y = quat[2]
+			msg.orientation.z = quat[3]
+			msg.orientation.w = quat[0]
+			msg.position.x = curr_base_pose[0, 3]
+			msg.position.y = curr_base_pose[1, 3]
+			msg.position.z = curr_base_pose[2, 3]
+			msgs.poses.append(msg)
+			robot_pub.publish(msgs)			
 			rate.sleep()
 
 if __name__ == '__main__':
@@ -203,7 +219,7 @@ if __name__ == '__main__':
 	pose_pub = rospy.Publisher('object_poses', PoseArray, queue_size=1) #add prefix
 	target_pub = rospy.Publisher('grasp_target', Int32, queue_size=1)
 	classes_pub = rospy.Publisher('grasp_classes', Int32MultiArray, queue_size=1)
-	gripper_pub = rospy.Publisher('gripper_pose', Pose, queue_size=1)
+	robot_pub = rospy.Publisher('robot_pose', PoseArray, queue_size=1)
 	renderer = YCBRenderer(width=width, height=height, render_marker=False, robot='panda_arm')
 	renderer.load_objects(obj_paths, texture_paths, colors)
 	renderer.set_camera_default()
@@ -213,8 +229,8 @@ if __name__ == '__main__':
 	robot = robot_kinematics('panda_arm')
 	rospy.Subscriber('grasp_pose', PoseArray, example_call_back)
 	curr_base_pose =  np.eye(4)
-	curr_base_pose[:3, :] =  mat_poses[:, :, target_idx]
-	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.5]) #fixed position for robot base
+	#curr_base_pose[:3, :] = mat_poses[:, :, target_idx]
+	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.7]) #fixed position for robot base
 	gripperPose = robot.solve_poses_from_joint(np.zeros(11), 'panda_link0')[-1]
 
 	try:

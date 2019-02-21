@@ -3,7 +3,7 @@
    <arg name="default_dir" default="$(env GRASPIT)"/>
    <arg name="world" default="empty"/>
    <arg name="robot" default="panda"/>
-   <arg name="max_plan_iter" default="60000"/>
+   <arg name="max_plan_iter" default="30100"/>
    <arg name="max_plan_result" default="10"/>
    <arg name="iter_count" default="1"/>
     <node name="grasp_listener" pkg="graspit_pose" type="graspit_planning_node" respawn="false" required="true"
