@@ -14,7 +14,24 @@ from std_msgs.msg import Int32MultiArray
 from geometry_msgs.msg import PoseArray, Pose
 from transforms3d.quaternions import axangle2quat, mat2quat, qmult, qinverse
 from robotPose.robot_pykdl import *
-
+def rotZ(rotz):
+    RotZ = np.matrix([[np.cos(rotz), -np.sin(rotz), 0, 0], 
+                  [np.sin(rotz), np.cos(rotz), 0, 0], 
+                  [0, 0, 1, 0], 
+                  [0, 0, 0, 1]])
+    return RotZ
+def rotX(rotx):
+    RotX = np.matrix([[1, 0, 0, 0], 
+                      [0, np.cos(rotx), -np.sin(rotx), 0], 
+                      [0, np.sin(rotx), np.cos(rotx), 0], 
+                      [0, 0, 0, 1]])
+    return RotX
+def rotY(roty):
+    RotY = np.matrix([[np.cos(roty), 0, np.sin(roty), 0], 
+                      [0, 1, 0, 0], 
+                      [-np.sin(roty), 0, np.cos(roty) , 0], 
+                      [0, 0, 0, 1]])
+    return RotY
 def deg2rad(deg):
     if type(deg) is list:
         return [x/180.0*np.pi for x in deg]
@@ -229,8 +246,9 @@ if __name__ == '__main__':
 	robot = robot_kinematics('panda_arm')
 	rospy.Subscriber('grasp_pose', PoseArray, example_call_back)
 	curr_base_pose =  np.eye(4)
-	#curr_base_pose[:3, :] = mat_poses[:, :, target_idx]
-	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.7]) #fixed position for robot base
+	#curr_base_pose[:3, :] = mat_poses[:, :, target_idx] 
+	curr_base_pose = rotY(-np.pi/2).dot(rotX(-np.pi/2).dot(curr_base_pose)) # switch rotation axes
+	curr_base_pose[:3, 3] += np.array([-0.4, 0.2, 0.7]).reshape([3, 1]) #fixed position for robot base
 	gripperPose = robot.solve_poses_from_joint(np.zeros(11), 'panda_link0')[-1]
 
 	try:
