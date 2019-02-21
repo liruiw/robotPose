@@ -76,8 +76,7 @@ int main(int argc, char **argv)
 
     for (int i = 1; i < YCB_classes.size(); i++)
     {
-      std::string source_frame = "00_" + YCB_classes[i];
-       // add listen to gripper and table pose
+      std::string source_frame = "00_" + YCB_classes[i] + "_world";
       try
       {
         listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
@@ -97,6 +96,46 @@ int main(int argc, char **argv)
       }
     }
 
+    // look for gripper pose
+    std::string source_frame = "panda_hand_world";
+    try
+    {
+      listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+
+      // rotation
+      tf::Quaternion tfQuat = transform.getRotation();
+
+      // translation
+      tf::Vector3 tfVec = transform.getOrigin();
+
+      gripperInitialPose = transf(Eigen::Quaterniond(tfQuat.w(), tfQuat.x(), tfQuat.y(), tfQuat.z()),
+        Eigen::Vector3d(tfVec.getX() * 1000, tfVec.getY() * 1000, tfVec.getZ() * 1000));
+    }
+    catch (tf::TransformException ex)
+    {
+      ROS_ERROR("%s", ex.what());
+    }
+
+    // look for table pose
+    source_frame = "table_world";
+    try
+    {
+      listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+
+      // rotation
+      tf::Quaternion tfQuat = transform.getRotation();
+
+      // translation
+      tf::Vector3 tfVec = transform.getOrigin();
+
+      tablePose = transf(Eigen::Quaterniond(tfQuat.w(), tfQuat.x(), tfQuat.y(), tfQuat.z()),
+        Eigen::Vector3d(tfVec.getX() * 1000, tfVec.getY() * 1000, tfVec.getZ() * 1000));
+    }
+    catch (tf::TransformException ex)
+    {
+      ROS_ERROR("%s", ex.what());
+    }
+
     // if some object is detected
     if (ros_clsData.size() > 0) 
     {
@@ -106,6 +145,9 @@ int main(int argc, char **argv)
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
         std::cout << "TF: " << objectPoses[i] << " "  << std::endl;
       }
+
+      std::cout << "Hand TF: " << gripperInitialPose << std::endl;
+      std::cout << "Table TF: " << tablePose << std::endl;
 
       // std::cout << "press enter to exit...";
       // while(getchar() == '\n')
