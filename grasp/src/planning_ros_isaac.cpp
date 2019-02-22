@@ -174,29 +174,29 @@ int main(int argc, char **argv)
       std::vector<std::string> objectFileList;
       Eigen::Matrix4d poseMatrix; 	
 
-      // load objects
-      for(int i = 0; i < objectPoses.size(); ++i)
-      {
-        std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
-        bool graspable = false;
-        if((int)ros_clsData[i] == object) { 
-          graspable = true;
-        }
-        if(!repeated) {          
-          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
-        }
-        else {
-          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
-        }     
-      }
-
       //load gripper
       if(!repeated) {          
-        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); //place as occluder
+        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); 
       }
       else {
         graspitMgr->moveRobot(robot, gripperInitialPose); //ignore collsion, add switch?
       } 
+
+      // load objects
+      for(int i = 0; i < objectPoses.size(); ++i)
+      {
+        std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
+        bool graspable = true;
+        if(!graspitMgr->isObjectLoaded(YCB_classes[ros_clsData[i]])) {          
+          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
+        }
+        else {
+          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
+        }    
+        if((int)ros_clsData[i] == object) { 
+          graspitMgr->setCurrentGraspableObject(YCB_classes[ros_clsData[i]]);
+        }
+      }
 
       //load table
       if(!repeated) {          
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
       }
       else {
         graspitMgr->moveObject("dinner_table", tablePose); //ignore collsion, add switch?
-      } 
+      }  
 
       GraspIt::EigenTransform gripperPose;
 
@@ -256,6 +256,7 @@ int main(int argc, char **argv)
           pose.orientation.y = orientation.y();
           pose.orientation.z = orientation.z();
           pose.orientation.w = orientation.w();
+          // if(energy < 45)
           output_msg.poses.push_back(pose);
         }
       }

@@ -26,12 +26,12 @@
 #include "graspit/EGPlanner/searchStateImpl.h"
 #include "graspit/robot.h"
 #include "graspit/eigenGrasp.h"
-
+#include "graspit/grasp.h"
 #include "graspit/debug.h"
 bool INIT;
 Eigen::Vector2d xBound;
 Eigen::Vector2d yBound;
-
+GraspableBody* prevObject;
 void PostureStateDOF::createVariables()
 {
   QString name("DOF ");
@@ -149,7 +149,8 @@ void PositionStateComplete::setTran(const transf &t)
 
 void PositionStateAA::getHandBound()
 {
-  if (! INIT) { // only initialize once per run
+  GraspableBody* curObject = mHand->getGrasp()->getObject();
+  if (! INIT || (curObject != prevObject)) { // only initialize once per run
     Eigen::Vector3d hand_pos = mHand->getTran().translation();
     float x = mHand->getTran().translation().x();
     float y = mHand->getTran().translation().y();
@@ -172,6 +173,8 @@ void PositionStateAA::getHandBound()
         yBound = Eigen::Vector2d(-250, 50);
       }
     }
+    prevObject = curObject;
+    std::cout << "curObject " << curObject << std::endl;
   }
   INIT = true;
 }

@@ -12,3 +12,4 @@ grasp/scripts/models
 grasp/scripts/test_image
 grasp/scripts/ycb_render
 grasp/scripts/YCB_Video
+grasp/scripts/mesh

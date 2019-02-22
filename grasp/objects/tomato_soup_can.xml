@@ -1,6 +1,0 @@
-<?xml version="1.0" ?>
-<root>
-	<mass>300</mass>
-	<cog>0 0 0</cog>
-	<geometryFile type="Inventor">tomato_soup_can_new.wrl</geometryFile>
-</root>
