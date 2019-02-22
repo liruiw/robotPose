@@ -2,13 +2,14 @@ import rospy
 import tf
 import numpy as np
 import argparse
+import torch
 from transforms3d.quaternions import mat2quat, quat2mat
 
 import roslib
 roslib.load_manifest('joint_states_listener')
 from joint_states_listener.srv import ReturnJointStates
-
 from robotPose.robot_pykdl import *
+
 
 ycb_classes = ('002_master_chef_can', '003_cracker_box', '004_sugar_box', '005_tomato_soup_can', '006_mustard_bottle', \
                '007_tuna_fish_can', '008_pudding_box', '009_gelatin_box', '010_potted_meat_can', '011_banana', '019_pitcher_base', \
@@ -68,11 +69,9 @@ if __name__ == '__main__':
 
     name = 'compute_world_poses'
     parser = argparse.ArgumentParser(name)
-    parser.add_argument(
-            '--camera',
-            type=str,
-            default='camera',
-            help='camera name')
+    parser.add_argument('--camera', dest='camera', help='ros camera to use', default='kinect1', type=str)
+    parser.add_argument('--debug', dest='debug', help='debug or not', default=False, type=bool)
+    parser.add_argument('--robot', type=str, default='panda_arm', help='Robot Name')
 
     args = parser.parse_args()
     ros_camera = args.camera
@@ -85,12 +84,80 @@ if __name__ == '__main__':
     suffix = '_world'
     base_link = 'panda_link0'
     target_frame = ros_camera + '_depth_optical_frame'
+    world_frame = '00_base_link'
 
     # load extents
     extents = np.loadtxt('extents.txt')
 
+    if args.debug:
+        width = 640
+        height = 480
+        camera_pos = np.array([0.6, -1.8, 1.2])
+        from ycb_renderer import YCBRenderer
+        renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
+
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand']
+        base_idx = 0
+        name = base_link.strip().split('_')[-1]
+        if name in models:
+            base_idx = models.index(name) + 1 #take the link name
+        obj_paths = ['{}_models/{}.DAE'.format(args.robot,item) for item in models]
+        colors = [[0.1*(idx+1),0,0] for idx in range(len(models))]
+        texture_paths = ['' for item in models]
+        cls_indexes = range(base_idx, len(models))
+
+        renderer.load_objects(obj_paths, texture_paths, colors)
+        renderer.set_camera_default()
+        renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
+        renderer.set_light_pos([0, 0, 1])
+        image_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
+        seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
+
     rate = rospy.Rate(10.0)
     while not rospy.is_shutdown():
+
+        # check robot joints first
+        (position, velocity, effort) = call_return_joint_states(joint_names)
+        position = position + (0,)
+        print('panda joints')
+        print(position)
+
+        # poses from joints
+        joints = rad2deg(np.array(position))
+        robot_poses = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
+        robot_poses = robot.offset_pose_center(robot_poses, dir='off', base_link=base_link)
+        pose_hand_base = robot_poses[-1]
+        print(len(robot_poses))
+        print(pose_hand_base)
+
+        # render the robot for debug
+        if args.debug:
+            renderer.set_camera(camera_pos, 2*camera_pos, [0,0,-1])
+            renderer.set_light_pos(camera_pos + np.random.uniform(-0.5, 0.5, 3))
+            intensity = np.random.uniform(0.8, 2)
+            light_color = intensity * np.random.uniform(0.9, 1.1, 3)
+            renderer.set_light_color(light_color)
+
+            poses = []
+            for i in range(len(robot_poses)):
+                pose_i = robot_poses[i]
+                rot = mat2quat(pose_i[:3,:3])
+                trans = pose_i[:3,3]
+                poses.append(np.hstack((trans,rot))) 
+            renderer.set_poses(poses)
+            renderer.render(range(joints.shape[0]), image_tensor, seg_tensor)
+            image_tensor = image_tensor.flip(0)
+            seg_tensor = seg_tensor.flip(0)
+            im = image_tensor.cpu().numpy()
+            im = np.clip(im, 0, 1)
+            im = im[:, :, (2, 1, 0)] * 255
+            image = im.astype(np.uint8)
+
+            import matplotlib.pyplot as plt
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            plt.imshow(image)
+            plt.show()
 
         # look for object poses in camera frame
         cls_indexes = []
@@ -136,29 +203,29 @@ if __name__ == '__main__':
 
         print('hand pose')
         print(pose_hand)
-        continue
 
-        # look for robot joints
-        (position, velocity, effort) = call_return_joint_states(joint_names)
-        print(position)
-
-        # poses from joints
-        robot_poses = robot.solve_poses_from_joint(np.array(position), base_link, base_pose=np.eye(4))
+        # camera to base transform
+        RT_hand = np.eye(4, dtype=np.float32)
+        RT_hand[:3, :3] = quat2mat(pose_hand[:4])
+        RT_hand[:3, 3] = pose_hand[4:]
+        RT_base = np.dot(pose_hand_base, np.linalg.inv(RT_hand))
+        print(RT_base)
 
         # compute table pose
         points = np.zeros((3, len(cls_indexes) * 8), dtype=np.float32)
         for i in range(len(cls_indexes)):
             bb3d = get_bb3D(extents[cls_indexes[i]])
             # transform the 3D box
-            RT = np.zeros((3, 4), dtype=np.float32)
+            RT = np.eye(4, dtype=np.float32)
             RT[:3, :3] = quat2mat(poses[i][:4])
-            RT[:, 3] = poses[i][4:]
+            RT[:3, 3] = poses[i][4:]
+            RT = np.dot(RT_base, RT)
             print(RT)
 
             x3d = np.ones((4, 8), dtype=np.float32)
             x3d[0:3, :] = bb3d
             x3d = np.matmul(RT, x3d)
-            points[:, i*8:i*8+8] = x3d
+            points[:, i*8:i*8+8] = x3d[:3, :]
 
         pose_table = np.zeros((7,), dtype=np.float32)
         pose_table[0] = 1
@@ -174,18 +241,31 @@ if __name__ == '__main__':
         # publish poses
         for i in range(len(cls_indexes)):
             # object pose
+            RT = np.eye(4, dtype=np.float32)
+            RT[:3, :3] = quat2mat(poses[i][:4])
+            RT[:3, 3] = poses[i][4:]
+            RT = np.dot(RT_base, RT)
+
             if ycb_classes[i][3] == '_':
                 source_frame = prefix + ycb_classes[cls_indexes[i]][4:] + suffix
             else:
                 source_frame = prefix + ycb_classes[cls_indexes[i]] + suffix
-            br.sendTransform(poses[i][4:7], ros_quat(poses[i][:4]), rospy.Time.now(), source_frame, target_frame)
+            br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
 
             # hand pose
+            RT = np.eye(4, dtype=np.float32)
+            RT[:3, :3] = quat2mat(pose_hand[:4])
+            RT[:3, 3] = pose_hand[4:]
+            RT = np.dot(RT_base, RT)
             source_frame = 'panda_hand' + suffix
-            br.sendTransform(pose_hand[4:7], ros_quat(pose_hand[:4]), rospy.Time.now(), source_frame, target_frame)
+            br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
 
             # table pose
             source_frame = 'table' + suffix
-            br.sendTransform(pose_table[4:7], ros_quat(pose_table[:4]), rospy.Time.now(), source_frame, target_frame)
+            br.sendTransform(pose_table[4:7], ros_quat(pose_table[:4]), rospy.Time.now(), source_frame, world_frame)
+
+            # base in camera
+            RT = np.linalg.inv(RT_base)
+            br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), world_frame, target_frame)
 
         rate.sleep()
