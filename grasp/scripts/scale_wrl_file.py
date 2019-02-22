@@ -13,10 +13,10 @@ holder = []
 scale_flag = False
 #obj = [name for name in os.listdir('models') if name.endswith(model_path)][0]
 mkdir_if_missing('mesh')
-for obj in os.listdir('models'):
+for obj in os.listdir('scripts/models'):
     model_path = '_'.join(obj.split('_')[1:])
     print 'model path', obj, model_path
-    os.system('meshlabserver -i models/{}/textured_simple.obj -o mesh/{}.wrl'.format(obj, model_path))
+    os.system('meshlabserver -i scripts/models/{}/textured_simple.obj -o mesh/{}.wrl'.format(obj, model_path))
     with open("mesh/{}.wrl".format(model_path), "rb") as vrml,\
      open("mesh/{}_new.wrl".format(model_path), "w+") as vrml2:
         for lines in vrml:
@@ -47,7 +47,6 @@ for obj in os.listdir('models'):
         xml.write('\t<cog>0 0 0</cog>\n')
         xml.write('\t<geometryFile type="Inventor">{}_new.wrl</geometryFile>\n'.format(model_path))
         xml.write('</root>\n')
-
     #hard coded path
-    os.system('cp mesh/{}.xml $GRASPIT/models/objects/{}.xml'.format(model_path, model_path))
-    os.system('cp mesh/{}_new.wrl $GRASPIT/models/objects/{}_new.wrl'.format(model_path, model_path))
+    # os.system('cp mesh/{}.xml $GRASPIT/models/objects/{}.xml'.format(model_path, model_path))
+    # os.system('cp mesh/{}_new.wrl $GRASPIT/models/objects/{}_new.wrl'.format(model_path, model_path))
