@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<root>
+	<material>plastic</material>
+	<mass>300</mass>
+	<cog>0 0 0</cog>
+	<geometryFile type="Inventor">tuna_fish_can_new.wrl</geometryFile>
+</root>
