@@ -98,9 +98,9 @@ if __name__ == '__main__':
         for i in range(len(ycb_classes)):
 
             if ycb_classes[i][3] == '_':
-                source_frame = prefix + ycb_classes[i][4:] + '_deepim'
+                source_frame = 'deepim/' + prefix + ycb_classes[i][4:]
             else:
-                source_frame = prefix + ycb_classes[i] + '_deepim'
+                source_frame = 'deepim/' + prefix + ycb_classes[i] 
 
             try:
                 (trans, rot) = listener.lookupTransform(target_frame, source_frame, rospy.Time(0))
@@ -123,7 +123,7 @@ if __name__ == '__main__':
             print(poses[i])
 
         # look for hand pose in camera frame
-        source_frame = 'panda_hand'
+        source_frame = 'deepim/01_hand'
         try:
             (trans, rot) = listener.lookupTransform(target_frame, source_frame, rospy.Time(0))
             pose_hand = np.zeros((7,), dtype=np.float32)
@@ -133,6 +133,10 @@ if __name__ == '__main__':
             pose_hand[6] = trans[2]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             continue
+
+        print('hand pose')
+        print(pose_hand)
+        continue
 
         # look for robot joints
         (position, velocity, effort) = call_return_joint_states(joint_names)
