@@ -43,6 +43,7 @@ void tablePoseCallback(const geometry_msgs::Pose &tPose)
   tablePose = transf(Eigen::Quaterniond(tPose.orientation.w, tPose.orientation.x, 
     tPose.orientation.y, tPose.orientation.z), Eigen::Vector3d(tPose.position.x * 1000, 
     tPose.position.y * 1000, tPose.position.z * 1000));
+  tableReady = true;
 }
 
 void classIndexCallback(const std_msgs::Int32MultiArray &cls_indexes)
@@ -83,7 +84,6 @@ int main(int argc, char **argv) {
   nh.getParam("robot", robot);
   nh.getParam("iter_count", iter_count);
   nh.getParam("max_plan_result", max_plan_result);
-  nh.getParam("mat_file", mat_file);
   std::cout << robot << std::endl;
   std::string worldFilename(default_dir + "/worlds/empty.xml");
   std::string robotFilename(default_dir + "/models/robots/" + robot + "/" + robot + ".xml");
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   SHARED_PTR<GraspIt::GraspItSceneManager> graspitMgr(new GraspIt::GraspItSceneManagerHeadless());
 
   while (ros::ok()) { 
-    if (objectReady && poseReady && gripperPoseReady && classReady) {
+    if (objectReady && poseReady && gripperPoseReady && classReady && tableReady) {
       for (int i = 0; i < ros_clsData.size(); i++)
       {
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
@@ -111,41 +111,23 @@ int main(int argc, char **argv) {
         graspitMgr->loadWorld(worldFilename); //load the world with anchor  
       }  
 
-      //load gripper
-      if(!repeated) {          
-        graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); 
-      }
-      else {
-        graspitMgr->moveRobot(robot, gripperInitialPose); //ignore collsion, add switch?
-      } 
-
+      //load gripper         
+      graspitMgr->loadRobot(robotFilename, robot, gripperInitialPose); 
       // load objects
       for(int i = 0; i < objectPoses.size(); ++i)
       {
         std::string objectFilename(default_dir + "/models/objects/" + YCB_classes[ros_clsData[i]] + ".xml");
-        bool graspable = true;
-        if(!graspitMgr->isObjectLoaded(YCB_classes[ros_clsData[i]])) {          
-          graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], graspable, objectPoses[i]); //place as occluder
-        }
-        else {
-          graspitMgr->moveObject(YCB_classes[ros_clsData[i]], objectPoses[i]); //ignore collsion, add switch?
-        }    
+        graspitMgr->loadObject(objectFilename, YCB_classes[ros_clsData[i]], true, objectPoses[i]); //place as occluder  
         if((int)ros_clsData[i] == object) { 
           graspitMgr->setCurrentGraspableObject(YCB_classes[ros_clsData[i]]);
         }
       }
 
-      //load table
-      if(!repeated) {          
-        graspitMgr->loadObject(tableFilename, "dinner_table", false, tablePose); //place as occluder
-      }
-      else {
-        graspitMgr->moveObject("dinner_table", tablePose); //ignore collsion, add switch?
-      } 
+      //load table  
+      graspitMgr->loadObject(tableFilename, "dinner_table", false, tablePose); //place as occluder
 
       GraspIt::EigenTransform gripperPose;
       for (int i = 0; i < iter_count; i++) {
-        graspitMgr->moveRobot(robot, gripperInitialPose);         
         graspitMgr->saveGraspItWorld(outputDirectory + "/worlds/startWorld_"  + std::to_string(i + 1) +  ".xml", createDir);
         graspitMgr->saveInventorWorld(outputDirectory + "/worlds/startWorld_" + std::to_string(i + 1) +  ".iv", createDir);
         SHARED_PTR<GraspIt::EigenGraspPlanner> planner(new GraspIt::EigenGraspPlanner("YCB_Grasp", graspitMgr)); //create
@@ -198,6 +180,13 @@ int main(int argc, char **argv) {
       classReady = false; gripperPoseReady = false;
       objectPoses.clear();
       ros_clsData.clear();
+      // remove all objects and wait for next call
+      for(int i = 0; i < objectPoses.size(); ++i)
+      {
+        graspitMgr->removeObject(YCB_classes[ros_clsData[i]]); 
+      }
+      graspitMgr->removeRobot(robot); 
+      graspitMgr->removeObject("dinner_table"); 
       repeated = true;
     }
     ros::spinOnce();

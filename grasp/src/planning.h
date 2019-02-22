@@ -34,6 +34,7 @@ std::vector<int> ros_clsData;
 bool poseReady;
 bool classReady;
 bool objectReady;
+bool tableReady;
 bool gripperPoseReady;
 bool repeated = false;
 std::vector<GraspIt::EigenTransform> objectPoses;

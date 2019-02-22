@@ -9,7 +9,7 @@ make install $orocos_kinematics_dynamics/orocos_kdl and python_orocos_kdl
 
 To generate a usable urdf seperate from ros, run (panda arm for instance):
 ```Shell
-rosrun xacro xacro --inorder panda_arm.xacro > panda_arm.urdf
+rosrun xacro xacro --inorder panda_arm.urdf.xacro > panda_arm.urdf
 ```
 To test the pose-joint conversions for baxter or panda_arm, run
 ```Shell
@@ -24,6 +24,3 @@ To control simulation, follow instructions to install Moveit from **http://sdk.r
 
 After you start the simulation, you can control the robot arm using moveit in misc folder. run moveit with franka, follow the instructions here:
 **http://docs.ros.org/kinetic/api/moveit_tutorials/html/doc/getting_started/getting_started.html**
-```Shell
-python move_arm.py --robot=panda_arm
-```
