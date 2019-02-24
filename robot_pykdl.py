@@ -71,7 +71,7 @@ class robot_kinematics(object):
         cur_path = os.path.dirname(os.path.abspath(__file__))
         if robot == 'panda_arm':
             self._robot = URDF.from_xml_string(open(os.path.join(cur_path,\
-            '{}_models'.format(robot), 'panda_arm_hand_camera.urdf'), 'r+').read()) 
+            '{}_models'.format(robot), 'panda_arm_hand.urdf'), 'r+').read()) 
         elif robot == 'baxter': 
             self._robot = URDF.from_xml_string(open(os.path.join(cur_path,\
             '{}_models'.format(robot),  'baxter_arm_hand.urdf'), 'r+').read())
@@ -391,7 +391,7 @@ def main():
     args = parser.parse_args()
     camera_intrinsics=np.array([[525, 0, 319.5],[ 0, 525, 239.5],[0, 0, 1]])    
     camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, \
-               -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
+     -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
     width = 640 
     height = 480
     camera_pos = np.array([0.6, -1.8, 1.2])
