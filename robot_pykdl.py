@@ -399,7 +399,7 @@ def main():
     mkdir_if_missing('test_image')
     renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
     if args.robot == 'panda_arm':
-        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger', 'camera']
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger']
         base_link = 'panda_link0'
         if args.test == 'middle':
             base_link = 'panda_link3'
