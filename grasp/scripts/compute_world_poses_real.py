@@ -114,6 +114,7 @@ if __name__ == '__main__':
         seg_tensor = torch.cuda.FloatTensor(height, width, 4).detach()
 
     rate = rospy.Rate(10.0)
+    RT_base = None
     while not rospy.is_shutdown():
 
         # check robot joints first
@@ -205,11 +206,12 @@ if __name__ == '__main__':
         print(pose_hand)
 
         # camera to base transform
-        RT_hand = np.eye(4, dtype=np.float32)
-        RT_hand[:3, :3] = quat2mat(pose_hand[:4])
-        RT_hand[:3, 3] = pose_hand[4:]
-        RT_base = np.dot(pose_hand_base, np.linalg.inv(RT_hand))
-        print(RT_base)
+        if RT_base is None:
+            RT_hand = np.eye(4, dtype=np.float32)
+            RT_hand[:3, :3] = quat2mat(pose_hand[:4])
+            RT_hand[:3, 3] = pose_hand[4:]
+            RT_base = np.dot(pose_hand_base, np.linalg.inv(RT_hand))
+            print(RT_base)
 
         # compute table pose
         points = np.zeros((3, len(cls_indexes) * 8), dtype=np.float32)
