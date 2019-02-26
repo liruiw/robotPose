@@ -213,70 +213,70 @@ if __name__ == '__main__':
             RT_base = np.dot(pose_hand_base, np.linalg.inv(RT_hand))
             print(RT_base)
 
-        # compute table pose
-        points = np.zeros((3, len(cls_indexes) * 8), dtype=np.float32)
-        for i in range(len(cls_indexes)):
-            bb3d = get_bb3D(extents[cls_indexes[i]])
-            # transform the 3D box
-            RT = np.eye(4, dtype=np.float32)
-            RT[:3, :3] = quat2mat(poses[i][:4])
-            RT[:3, 3] = poses[i][4:]
-            RT = np.dot(RT_base, RT)
-            print(RT)
+            # compute table pose
+            points = np.zeros((3, len(cls_indexes) * 8), dtype=np.float32)
+            for i in range(len(cls_indexes)):
+                bb3d = get_bb3D(extents[cls_indexes[i]])
+                # transform the 3D box
+                RT = np.eye(4, dtype=np.float32)
+                RT[:3, :3] = quat2mat(poses[i][:4])
+                RT[:3, 3] = poses[i][4:]
+                RT = np.dot(RT_base, RT)
+                print(RT)
 
-            x3d = np.ones((4, 8), dtype=np.float32)
-            x3d[0:3, :] = bb3d
-            x3d = np.matmul(RT, x3d)
-            points[:, i*8:i*8+8] = x3d[:3, :]
+                x3d = np.ones((4, 8), dtype=np.float32)
+                x3d[0:3, :] = bb3d
+                x3d = np.matmul(RT, x3d)
+                points[:, i*8:i*8+8] = x3d[:3, :]
 
-        pose_table = np.zeros((7,), dtype=np.float32)
-        pose_table[0] = 1
-        pose_table[1] = 0
-        pose_table[2] = 0
-        pose_table[3] = 0
-        if len(cls_indexes) > 0:
-            pose_table[4] = np.mean(points[0, :]) - 0.9
-            pose_table[5] = np.mean(points[1, :]) - 0.5
-            pose_table[6] = points[2, :].min() - 0.8
-            print(pose_table)
+            pose_table = np.zeros((7,), dtype=np.float32)
+            pose_table[0] = 1
+            pose_table[1] = 0
+            pose_table[2] = 0
+            pose_table[3] = 0
+            if len(cls_indexes) > 0:
+                pose_table[4] = np.mean(points[0, :]) - 0.9
+                pose_table[5] = np.mean(points[1, :]) - 0.5
+                pose_table[6] = points[2, :].min() - 0.8
+                print(pose_table)
 
-        pose_table_obstacle = pose_table.copy()
-        pose_table_obstacle[4] += 0.9
-        pose_table_obstacle[5] += 0.5
-        pose_table_obstacle[6] += 0.3
+            pose_table_obstacle = pose_table.copy()
+            pose_table_obstacle[4] += 0.9
+            pose_table_obstacle[5] += 0.5
+            pose_table_obstacle[6] += 0.3
 
-        # wall left
-        pose_wall_left = np.zeros((7,), dtype=np.float32)
-        pose_wall_left[0] = 1
-        pose_wall_left[1] = 0
-        pose_wall_left[2] = 0
-        pose_wall_left[3] = 0
-        if len(cls_indexes) > 0:
-            pose_wall_left[4] = np.mean(points[0, :])
-            pose_wall_left[5] = np.min(points[1, :]) - 0.2
-            pose_wall_left[6] = np.mean(points[2, :])
+            # wall left
+            pose_wall_left = np.zeros((7,), dtype=np.float32)
+            pose_wall_left[0] = 1
+            pose_wall_left[1] = 0
+            pose_wall_left[2] = 0
+            pose_wall_left[3] = 0
+            if len(cls_indexes) > 0:
+                pose_wall_left[4] = np.mean(points[0, :])
+                pose_wall_left[5] = np.min(points[1, :]) - 0.2
+                pose_wall_left[6] = np.mean(points[2, :])
 
-        # wall right
-        pose_wall_right = np.zeros((7,), dtype=np.float32)
-        pose_wall_right[0] = 1
-        pose_wall_right[1] = 0
-        pose_wall_right[2] = 0
-        pose_wall_right[3] = 0
-        if len(cls_indexes) > 0:
-            pose_wall_right[4] = np.mean(points[0, :])
-            pose_wall_right[5] = np.max(points[1, :]) + 0.2
-            pose_wall_right[6] = np.mean(points[2, :])
+            # wall right
+            pose_wall_right = np.zeros((7,), dtype=np.float32)
+            pose_wall_right[0] = 1
+            pose_wall_right[1] = 0
+            pose_wall_right[2] = 0
+            pose_wall_right[3] = 0
+            if len(cls_indexes) > 0:
+                pose_wall_right[4] = np.mean(points[0, :])
+                pose_wall_right[5] = np.max(points[1, :]) + 0.2
+                pose_wall_right[6] = np.mean(points[2, :])
 
-        # wall top
-        pose_wall_top = np.zeros((7,), dtype=np.float32)
-        pose_wall_top[0] = 1
-        pose_wall_top[1] = 0
-        pose_wall_top[2] = 0
-        pose_wall_top[3] = 0
-        if len(cls_indexes) > 0:
-            pose_wall_top[4] = np.mean(points[0, :])
-            pose_wall_top[5] = np.mean(points[1, :])
-            pose_wall_top[6] = np.max(points[2, :]) + 0.5
+            # wall top
+            pose_wall_top = np.zeros((7,), dtype=np.float32)
+            pose_wall_top[0] = 1
+            pose_wall_top[1] = 0
+            pose_wall_top[2] = 0
+            pose_wall_top[3] = 0
+            if len(cls_indexes) > 0:
+                pose_wall_top[4] = np.mean(points[0, :])
+                pose_wall_top[5] = np.mean(points[1, :])
+                pose_wall_top[6] = np.max(points[2, :]) + 0.5
 
         # publish poses
         for i in range(len(cls_indexes)):

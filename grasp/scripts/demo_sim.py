@@ -75,6 +75,13 @@ def call_return_grasps():
 
     return (resp.position, resp.orientation)
 
+def grasp_publisher(br, RT):
+
+    world_frame = '00_base_link'
+    source_frame = 'selected_grasp'
+    br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
+
+
 if __name__ == '__main__':
     name = 'grasp_object'
     parser = argparse.ArgumentParser(name)
@@ -92,6 +99,11 @@ if __name__ == '__main__':
             type=int,
             default=-1,
             help='If set, choose the grasp number')
+    parser.add_argument(
+            '--real_robot',
+            type=bool,
+            default=True,
+            help='If set, run on real robot')
 
     joint_names = ["panda_joint1",
                    "panda_joint2",
@@ -109,6 +121,7 @@ if __name__ == '__main__':
     # ros node
     rospy.init_node(name)
     listener = tf.TransformListener()
+    br = tf.TransformBroadcaster()
 
     # read grasps from the grasp planner
     while 1:
@@ -141,7 +154,7 @@ if __name__ == '__main__':
     # define the robot
     print('<franka robot>')
     config_modulator = RobotConfigModulator()
-    franka = Franka(is_physical_robot=False)
+    franka = Franka(is_physical_robot=args.real_robot)
 
     # retrieve the pose of object
     target_frame = '00_base_link'
@@ -211,8 +224,6 @@ if __name__ == '__main__':
     grasp_obj = pose_grasp[index_min, :, :]
     print('Select grasp #', index_min)
     print(grasp_obj)
-    if pause_between_steps:
-        raw_input('Press key to continue')
 
     # transform to right gripper
     target_frame = 'panda_hand'
@@ -229,6 +240,13 @@ if __name__ == '__main__':
     # transform hand pose from object to base
     grasp_T = np.dot(obj_T, grasp_obj)
     grasp_frame = math_util.unpack_transform_to_frame(grasp_T)
+
+    # publish the grasp for visualization
+    t = threading.Thread(target=grasp_publisher, args=(br, grasp_T))
+    t.start()
+
+    if pause_between_steps:
+        raw_input('Press key to continue')
 
     # define the standoff pose
     print(grasp_T)
