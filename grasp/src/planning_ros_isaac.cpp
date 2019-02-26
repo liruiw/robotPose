@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 	
   // The world file name will be the first argument
   std::string output_dir, default_dir, mat_file;
-  std::string world, robot, frame;
+  std::string world, robot, frame, target_name;
   int max_plan_iter, iter_count, max_plan_result;
 
   //load all ros param
@@ -36,6 +36,7 @@ int main(int argc, char **argv)
   nh.getParam("default_dir", default_dir);
   nh.getParam("world", world);
   nh.getParam("frame", frame);
+  nh.getParam("target", target_name);
   nh.getParam("output_dir", output_dir);
   nh.getParam("max_plan_iter", max_plan_iter);
   nh.getParam("robot", robot);
@@ -72,11 +73,12 @@ int main(int argc, char **argv)
     std::string target_frame = frame;
     ros_clsData.clear();
     objectPoses.clear();
+    output_msg.header.frame_id = "";
     output_msg.poses.clear();
 
     for (int i = 1; i < YCB_classes.size(); i++)
     {
-      std::string source_frame = "00_" + YCB_classes[i] + "_world";
+      std::string source_frame = "00_" + YCB_classes[i];
       try
       {
         listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
@@ -140,10 +142,14 @@ int main(int argc, char **argv)
     if (ros_clsData.size() > 0) 
     {
       // print object info
+      object = -1;
       for (int i = 0; i < ros_clsData.size(); i++)
       {
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
         std::cout << "TF: " << objectPoses[i] << " "  << std::endl;
+
+        if (YCB_classes[ros_clsData[i]] == target_name)
+          object = ros_clsData[i];
       }
 
       std::cout << "Hand TF: " << gripperInitialPose << std::endl;
@@ -153,13 +159,11 @@ int main(int argc, char **argv)
       // while(getchar() == '\n')
       //  break;
 
-      // sample one object as the target
-      if(!repeated)
-      {
-        int index = rand() % ros_clsData.size();
-        object = ros_clsData[index];
-      }
-      object = ros_clsData[0];
+      std::cout << ros_clsData.size() << " objects detected" << std::endl;
+      std::cout << "Target object: " << YCB_classes[object] << std::endl;
+      if (object == -1)
+        continue;
+      output_msg.header.frame_id = "00_" + YCB_classes[object];
 
       // Load the graspit world
       std::string file_name = outputDirectory + "/" + YCB_classes[object] + "_grasp_pose.txt";
@@ -262,7 +266,7 @@ int main(int argc, char **argv)
       }
 
       grasp_pub.publish(output_msg);
-      repeated = true;
+      // repeated = true;
     }
 
     ros::spinOnce();

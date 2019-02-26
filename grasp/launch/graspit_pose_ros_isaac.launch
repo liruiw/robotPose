@@ -2,6 +2,7 @@
    <arg name="output_dir" default="$(env GRASPIT)/output"/>
    <arg name="default_dir" default="$(env GRASPIT)"/>
    <arg name="frame" default="00_base_link"/>
+   <arg name="target" default="sugar_box"/>
    <arg name="world" default="empty"/>
    <arg name="robot" default="panda"/>
    <arg name="max_plan_iter" default="60000"/>
@@ -15,6 +16,7 @@
       <param name="default_dir" value="$(arg default_dir)"/>
       <param name="world" value="$(arg world)"/>
       <param name="frame" value="$(arg frame)"/>
+      <param name="target" value="$(arg target)"/>
       <param name="robot" value="$(arg robot)"/>
       <param name="max_plan_iter" value="$(arg max_plan_iter)"/>
       <param name="max_plan_result" value="$(arg max_plan_result)"/>
