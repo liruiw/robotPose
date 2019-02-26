@@ -151,10 +151,11 @@ void PositionStateAA::getHandBound()
 {
   GraspableBody* curObject = mHand->getGrasp()->getObject();
   if (! INIT || (curObject != prevObject)) { // only initialize once per run
-    Eigen::Vector3d hand_pos = mHand->getTran().translation();
-    float x = mHand->getTran().translation().x();
-    float y = mHand->getTran().translation().y();
-    float z = mHand->getTran().translation().z();
+    Eigen::Vector3d hand_pos = (curObject->getTran().inverse())*(mHand->getTran()).translation();
+    float x = hand_pos[0];
+    float y = hand_pos[1];
+    float z = hand_pos[2];
+
     if (std::abs(x) > std::abs(y)) { //only sample from front face
       yBound = Eigen::Vector2d(-250, 250);
       if (x > 0) {
@@ -174,7 +175,10 @@ void PositionStateAA::getHandBound()
       }
     }
     prevObject = curObject;
-    std::cout << "curObject " << curObject << std::endl;
+    // std::cout << "curObject " << curObject << std::endl;
+    // std::cout << "xyz,"  << x << ", " << y << ", " << z << ", " << std::endl;
+    // std::cout << "xBound,"  << xBound[0] << ", " << xBound[1] << std::endl;
+    // std::cout << "yBound,"  << yBound[0] << ", " << yBound[1] << std::endl;
   }
   INIT = true;
 }
@@ -188,7 +192,7 @@ void PositionStateAA::createVariables()
   // mVariables.push_back(new SearchVariable("theta", 0, M_PI, 0, M_PI / 5));
   // mVariables.push_back(new SearchVariable("phi", -M_PI, M_PI, 0, M_PI / 2, true));
   // mVariables.push_back(new SearchVariable("alpha", 0, M_PI, M_PI / 2, M_PI / 2));
-  
+
   mVariables.push_back(new SearchVariable("Tx", xBound[0], xBound[1], 0, 150)); 
   mVariables.push_back(new SearchVariable("Ty", yBound[0], yBound[1], 0, 150));    
   mVariables.push_back(new SearchVariable("Tz", -250, 350, 350, 150));
