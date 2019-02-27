@@ -75,11 +75,14 @@ def call_return_grasps():
 
     return (resp.position, resp.orientation)
 
-def grasp_publisher(br, RT):
+def grasp_publisher(br, RT, RT_s):
 
     world_frame = '00_base_link'
     source_frame = 'selected_grasp'
-    br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
+    source_frame_s = 'selected_grasp_standoff'
+    while 1:
+        br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
+        br.sendTransform(RT_s[:3, 3], ros_quat(mat2quat(RT_s[:3, :3])), rospy.Time.now(), source_frame_s, world_frame)
 
 
 if __name__ == '__main__':
@@ -92,7 +95,8 @@ if __name__ == '__main__':
             help='If set, applies the grasp defined in the grasp data file specified by --grasp_rospath to the named object.')
     parser.add_argument(
             '--use_gripper',
-            action='store_true',
+            default=True,
+            type=bool,
             help='If set, uses the gripper, otherwise it doesn\'t.')
     parser.add_argument(
             '--use_grasp',
@@ -241,19 +245,19 @@ if __name__ == '__main__':
     grasp_T = np.dot(obj_T, grasp_obj)
     grasp_frame = math_util.unpack_transform_to_frame(grasp_T)
 
+    # define the standoff pose
+    print(grasp_T)
+    grasp_standoff = grasp_T.copy()
+    grasp_standoff[2, 3] += 0.2
+    print(grasp_standoff)
+    standoff_frame = math_util.unpack_transform_to_frame(grasp_standoff)
+
     # publish the grasp for visualization
-    t = threading.Thread(target=grasp_publisher, args=(br, grasp_T))
+    t = threading.Thread(target=grasp_publisher, args=(br, grasp_T, grasp_standoff))
     t.start()
 
     if pause_between_steps:
         raw_input('Press key to continue')
-
-    # define the standoff pose
-    print(grasp_T)
-    grasp_standoff = grasp_T.copy()
-    grasp_standoff[2, 3] += 0.1
-    print(grasp_standoff)
-    standoff_frame = math_util.unpack_transform_to_frame(grasp_standoff)
 
     print('<world client>')
     world = make_basic_world()
