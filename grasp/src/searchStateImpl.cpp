@@ -161,11 +161,11 @@ void PositionStateAA::getHandBound()
 
     int idx;
     std::vector<float> v; v.push_back(x); v.push_back(y); v.push_back(z); 
-    if (std::abs(x) < std::abs(y) && std::abs(x) < std::abs(z))   idx = 0; 
-    else if (std::abs(y) < std::abs(x) && std::abs(y) < std::abs(z)) idx = 1; 
+    if (std::abs(x) > std::abs(y) && std::abs(x) > std::abs(z))   idx = 0; 
+    else if (std::abs(y) > std::abs(x) && std::abs(y) > std::abs(z)) idx = 1; 
     else idx = 2; 
     for(int i = 0; i < 3; ++i) {
-      if (i != idx)  {
+      if (i == idx)  {
         if (v[i] > 0) {
           Bounds[i] = Eigen::Vector2d(25, 250); //only sample from front face if it's not the minimum coordinates
         }
