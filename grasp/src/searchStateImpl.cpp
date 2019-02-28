@@ -28,9 +28,9 @@
 #include "graspit/eigenGrasp.h"
 #include "graspit/grasp.h"
 #include "graspit/debug.h"
-bool INIT;
+//bool INIT;
 std::vector<Eigen::Vector2d> Bounds;
-GraspableBody* prevObject;
+//GraspableBody* prevObject;
 void PostureStateDOF::createVariables()
 {
   QString name("DOF ");
@@ -149,8 +149,8 @@ void PositionStateComplete::setTran(const transf &t)
 void PositionStateAA::getHandBound()
 {
   GraspableBody* curObject = mHand->getGrasp()->getObject();
-  if (! INIT || (curObject != prevObject)) { // only initialize once per run
-    Eigen::Vector3d hand_pos = (curObject->getTran().inverse())*(mHand->getTran()).translation();
+  //if (! INIT || (curObject != prevObject)) { // only initialize once per run
+    Eigen::Vector3d hand_pos = (curObject->getTran().inverse()).translation();
     float x = hand_pos[0];
     float y = hand_pos[1];
     float z = hand_pos[2];
@@ -166,25 +166,24 @@ void PositionStateAA::getHandBound()
     else idx = 2; 
     for(int i = 0; i < 3; ++i) {
       if (i != idx)  {
-         //std::cout << "idx, "  << idx << ", i, " << i << ", v[i], " << v[i] << std::endl;
         if (v[i] > 0) {
-          Bounds[i] = Eigen::Vector2d(0, 250); //only sample from front face if it's not the minimum coordinates
+          Bounds[i] = Eigen::Vector2d(25, 250); //only sample from front face if it's not the minimum coordinates
         }
         else{
-          Bounds[i] = Eigen::Vector2d(-250, 0);
+          Bounds[i] = Eigen::Vector2d(-250, 25);
         }           
       }
     }
 
-    prevObject = curObject;
+    //prevObject = curObject;
     // std::cout << "curObject " << curObject << std::endl;
     // std::cout << "xyz,"  << x << ", " << y << ", " << z << ", " << std::endl;
     // std::cout << "xBound,"  << Bounds[0][0] << ", " << Bounds[0][1] << std::endl;
     // std::cout << "yBound,"  << Bounds[1][0] << ", " << Bounds[1][1] << std::endl;
     // std::cout << "zBound,"  << Bounds[2][0] << ", " << Bounds[2][1] << std::endl;
 
-  }
-  INIT = true;
+  //}
+  //INIT = true;
 }
 
 void PositionStateAA::createVariables()
