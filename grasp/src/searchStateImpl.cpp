@@ -29,8 +29,7 @@
 #include "graspit/grasp.h"
 #include "graspit/debug.h"
 bool INIT;
-Eigen::Vector2d xBound;
-Eigen::Vector2d yBound;
+std::vector<Eigen::Vector2d> Bounds;
 GraspableBody* prevObject;
 void PostureStateDOF::createVariables()
 {
@@ -155,30 +154,35 @@ void PositionStateAA::getHandBound()
     float x = hand_pos[0];
     float y = hand_pos[1];
     float z = hand_pos[2];
+    Bounds.clear();
+    Bounds.push_back(Eigen::Vector2d(-250, 250));
+    Bounds.push_back(Eigen::Vector2d(-250, 250));
+    Bounds.push_back(Eigen::Vector2d(-250, 250));
 
-    if (std::abs(x) > std::abs(y)) { //only sample from front face
-      yBound = Eigen::Vector2d(-250, 250);
-      if (x > 0) {
-        xBound = Eigen::Vector2d(-50, 250);
-      }
-      else{
-        xBound = Eigen::Vector2d(-250, 50);
-      }
-    }     
-    else {
-      xBound = Eigen::Vector2d(-250, 250);
-      if (y > 0) {
-        yBound = Eigen::Vector2d(-50, 250);
-      }
-      else{
-        yBound = Eigen::Vector2d(-250, 50);
+    int idx;
+    std::vector<float> v; v.push_back(x); v.push_back(y); v.push_back(z); 
+    if (std::abs(x) < std::abs(y) && std::abs(x) < std::abs(z))   idx = 0; 
+    else if (std::abs(y) < std::abs(x) && std::abs(y) < std::abs(z)) idx = 1; 
+    else idx = 2; 
+    for(int i = 0; i < 3; ++i) {
+      if (i != idx)  {
+         //std::cout << "idx, "  << idx << ", i, " << i << ", v[i], " << v[i] << std::endl;
+        if (v[i] > 0) {
+          Bounds[i] = Eigen::Vector2d(0, 250); //only sample from front face if it's not the minimum coordinates
+        }
+        else{
+          Bounds[i] = Eigen::Vector2d(-250, 0);
+        }           
       }
     }
+
     prevObject = curObject;
     // std::cout << "curObject " << curObject << std::endl;
     // std::cout << "xyz,"  << x << ", " << y << ", " << z << ", " << std::endl;
-    // std::cout << "xBound,"  << xBound[0] << ", " << xBound[1] << std::endl;
-    // std::cout << "yBound,"  << yBound[0] << ", " << yBound[1] << std::endl;
+    // std::cout << "xBound,"  << Bounds[0][0] << ", " << Bounds[0][1] << std::endl;
+    // std::cout << "yBound,"  << Bounds[1][0] << ", " << Bounds[1][1] << std::endl;
+    // std::cout << "zBound,"  << Bounds[2][0] << ", " << Bounds[2][1] << std::endl;
+
   }
   INIT = true;
 }
@@ -193,9 +197,9 @@ void PositionStateAA::createVariables()
   // mVariables.push_back(new SearchVariable("phi", -M_PI, M_PI, 0, M_PI / 2, true));
   // mVariables.push_back(new SearchVariable("alpha", 0, M_PI, M_PI / 2, M_PI / 2));
 
-  mVariables.push_back(new SearchVariable("Tx", xBound[0], xBound[1], 0, 150)); 
-  mVariables.push_back(new SearchVariable("Ty", yBound[0], yBound[1], 0, 150));    
-  mVariables.push_back(new SearchVariable("Tz", -250, 350, 350, 150));
+  mVariables.push_back(new SearchVariable("Tx", Bounds[0][0], Bounds[0][1], 0, 150)); 
+  mVariables.push_back(new SearchVariable("Ty", Bounds[1][0], Bounds[1][1], 0, 150));    
+  mVariables.push_back(new SearchVariable("Tz", Bounds[2][0], Bounds[2][1], 350, 150));
   mVariables.push_back(new SearchVariable("theta", 0, M_PI, 0, M_PI / 5));
   mVariables.push_back(new SearchVariable("phi", -M_PI, M_PI, 0, M_PI / 2, true)); 
   mVariables.push_back(new SearchVariable("alpha", 0, M_PI, M_PI / 2, M_PI / 2));
