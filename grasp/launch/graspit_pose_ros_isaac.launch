@@ -2,12 +2,13 @@
    <arg name="output_dir" default="$(env GRASPIT)/output"/>
    <arg name="default_dir" default="$(env GRASPIT)"/>
    <arg name="frame" default="00_base_link"/>
-   <arg name="target" default="sugar_box"/>
+   <arg name="target" default="tomato_soup_can"/>
    <arg name="world" default="empty"/>
    <arg name="robot" default="panda"/>
-   <arg name="max_plan_iter" default="60000"/>
-   <arg name="max_plan_result" default="10"/>
+   <arg name="max_plan_iter" default="50000"/>
+   <arg name="max_plan_result" default="20"/>
    <arg name="iter_count" default="1"/>
+   <arg name="save_world" default="0"/>
     <node name="grasp_listener" pkg="graspit_pose" type="graspit_planning_isaac" respawn="false" required="true"
        args="$(arg output_dir) $(arg world) $(arg max_plan_iter)  $(arg max_plan_result) $(arg default_dir)  $(arg robot) $(arg iter_count)"
       output="screen">
@@ -21,5 +22,6 @@
       <param name="max_plan_iter" value="$(arg max_plan_iter)"/>
       <param name="max_plan_result" value="$(arg max_plan_result)"/>
       <param name="iter_count" value="$(arg iter_count)"/>
+      <param name="save_world" value="$(arg save_world)"/>
     
 </launch>

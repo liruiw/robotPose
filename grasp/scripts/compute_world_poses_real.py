@@ -113,7 +113,6 @@ if __name__ == '__main__':
                 robot_poses = robot.solve_poses_from_joint(np.array(joints), base_link, base_pose=np.eye(4))
                 robot_poses = robot.offset_pose_center(robot_poses, dir='off', base_link=base_link)
                 pose_hand_base = robot_poses[-1]
-                print(len(robot_poses))
                 print(pose_hand_base)
 
                 # look for hand pose in camera frame
@@ -144,6 +143,7 @@ if __name__ == '__main__':
                 poses[count, :4] = qt
                 poses[count, 4:] = RT_base[:3, 3]
                 count += 1
+                print(count)
 
             # average the poses
             RT_base = np.eye(4, dtype=np.float32)
@@ -231,7 +231,7 @@ if __name__ == '__main__':
             pose_wall_left[3] = 0
             if len(cls_indexes) > 0:
                 pose_wall_left[4] = np.mean(points[0, :])
-                pose_wall_left[5] = np.min(points[1, :]) - 0.2
+                pose_wall_left[5] = np.min(points[1, :]) - 0.5
                 pose_wall_left[6] = np.mean(points[2, :])
 
             # wall right
@@ -242,7 +242,7 @@ if __name__ == '__main__':
             pose_wall_right[3] = 0
             if len(cls_indexes) > 0:
                 pose_wall_right[4] = np.mean(points[0, :])
-                pose_wall_right[5] = np.max(points[1, :]) + 0.2
+                pose_wall_right[5] = np.max(points[1, :]) + 0.5
                 pose_wall_right[6] = np.mean(points[2, :])
 
             # wall top
