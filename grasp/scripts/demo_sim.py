@@ -45,11 +45,29 @@ from grasps_listener.srv import ReturnGrasps
 from transforms3d.quaternions import mat2quat, quat2mat
 from robotPose.robot_pykdl import *
 
+def tf_quat(ros_quat): #xyzw -> wxyz
+    quat = np.zeros(4)
+    quat[0] = ros_quat[-1]
+    quat[1:] = ros_quat[:-1]
+    return quat
+
 def ros_quat(tf_quat): #wxyz -> xyzw
     quat = np.zeros(4)
-    quat[-1] = tf_quat[0]
-    quat[:-1] = tf_quat[1:]
+    quat[0] = tf_quat[1]
+    quat[1] = tf_quat[2]
+    quat[2] = tf_quat[3]
+    quat[3] = tf_quat[0]
     return quat
+
+def rotation_z(theta):
+    t = theta * np.pi / 180.0
+    R = np.zeros((3, 3), dtype=np.float32)
+    R[0, 0] = np.cos(t)
+    R[0, 1] = -np.sin(t)
+    R[1, 0] = np.sin(t)
+    R[1, 1] = np.cos(t)
+    R[2, 2] = 1
+    return R
 
 def call_return_joint_states(joint_names):
     rospy.wait_for_service("return_joint_states")
@@ -75,14 +93,11 @@ def call_return_grasps():
 
     return (resp.position, resp.orientation)
 
-def grasp_publisher(br, RT, RT_s):
+def grasp_publisher(br, RT, source_frame):
 
     world_frame = '00_base_link'
-    source_frame = 'selected_grasp'
-    source_frame_s = 'selected_grasp_standoff'
     while 1:
         br.sendTransform(RT[:3, 3], ros_quat(mat2quat(RT[:3, :3])), rospy.Time.now(), source_frame, world_frame)
-        br.sendTransform(RT_s[:3, 3], ros_quat(mat2quat(RT_s[:3, :3])), rospy.Time.now(), source_frame_s, world_frame)
 
 
 if __name__ == '__main__':
@@ -121,6 +136,8 @@ if __name__ == '__main__':
     obj_name = args.apply_to
     pause_between_steps = True
     robot = robot_kinematics('panda_arm')
+    from lula_control.frame_commander import RobotConfigModulator
+    config_modulator = RobotConfigModulator()
 
     # ros node
     rospy.init_node(name)
@@ -196,7 +213,7 @@ if __name__ == '__main__':
 
     # read joints
     (position, velocity, effort) = call_return_joint_states(joint_names)
-    print(position)
+    print(rad2deg(np.array(position)))
 
     if args.use_grasp >= 0:
         index_min = args.use_grasp
@@ -204,25 +221,34 @@ if __name__ == '__main__':
         # for each grasp
         index_min = -1
         distance_min = 10000
+        joints_min = None
         for i in range(pose_grasp.shape[0]):
 
             # check feasibility
             grasp_candidate = np.dot(obj_T, pose_grasp[i, :, :])
+
+            source_frame = 'selected_grasp_graspit_%d' % i
+            t = threading.Thread(target=grasp_publisher, args=(br, grasp_candidate, source_frame))
+            t.start()
+
             pos = grasp_candidate[:3, 3]
             rot = ros_quat(mat2quat(grasp_candidate[:3, :3]))
-            joints =  robot.inverse_kinematics(pos, rot, np.array(position))
-            print('grasp %d' % i)
-            print(joints)
+            seed = rad2deg(np.array(position))
+            joints = robot.inverse_kinematics(pos, rot, seed)
             if joints is None:
                 continue
+            distance = np.sum(np.absolute(joints-seed))
+            print('grasp %d, joint difference %f' % (i,  distance))
+            print(joints)
 
-            grasp = pose_grasp[i, :3, 3]
-            grasp = grasp / np.linalg.norm(grasp)
+            # grasp = pose_grasp[i, :3, 3]
+            # grasp = grasp / np.linalg.norm(grasp)
             # compute cosine distance to the two anchors
-            distance = np.arccos(np.dot(grasp, anchor1_obj)) + np.arccos(np.dot(grasp, anchor2_obj))
+            # distance = np.arccos(np.dot(grasp, anchor1_obj)) + np.arccos(np.dot(grasp, anchor2_obj))
             if distance < distance_min:
                 index_min = i
                 distance_min = distance
+                joints_min = deg2rad(joints)
 
     # select the grasp
     grasp_obj = pose_grasp[index_min, :, :]
@@ -235,6 +261,9 @@ if __name__ == '__main__':
     trans, rot = listener.lookupTransform(target_frame, source_frame, rospy.Time(0))
     offset_pose = np.eye(4)
     offset_pose[:3, 3] = trans
+    offset_pose[:3, :3] = quat2mat(tf_quat(rot))
+    print('hand to right gripper')
+    print(offset_pose)
     grasp_obj = grasp_obj.dot(offset_pose)
 
     # offset center
@@ -247,13 +276,17 @@ if __name__ == '__main__':
 
     # define the standoff pose
     print(grasp_T)
-    grasp_standoff = grasp_T.copy()
-    grasp_standoff[2, 3] += 0.2
+    delta = np.eye(4, dtype=np.float32)
+    delta[2, 3] = -0.2
+    grasp_standoff = np.dot(grasp_T, delta)
     print(grasp_standoff)
     standoff_frame = math_util.unpack_transform_to_frame(grasp_standoff)
 
     # publish the grasp for visualization
-    t = threading.Thread(target=grasp_publisher, args=(br, grasp_T, grasp_standoff))
+    t = threading.Thread(target=grasp_publisher, args=(br, grasp_T, 'selected_grasp'))
+    t.start()
+
+    t = threading.Thread(target=grasp_publisher, args=(br, grasp_standoff, 'selected_grasp_standoff'))
     t.start()
 
     if pause_between_steps:
@@ -261,10 +294,13 @@ if __name__ == '__main__':
 
     print('<world client>')
     world = make_basic_world()
+    world.wait_for_objs()
     controllable_obj = ControllableObject(world.get_object(obj_name), robot=franka)
+    franka.end_effector.gripper.open(wait=False)
 
     print('Moving to standoff...')
     franka.set_speed(speed_level='slow')
+    config_modulator.send_config(joints_min)
     franka.end_effector.go_local(standoff_frame)
 
     if pause_between_steps:
@@ -294,6 +330,7 @@ if __name__ == '__main__':
 
     print('Picking object up...')
     bottom_frame = controllable_frames['bottom']
+    print(bottom_frame)
     init_frame = bottom_frame.frame
 
     print('init_frame:\n', init_frame)
