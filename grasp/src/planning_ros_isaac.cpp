@@ -24,8 +24,8 @@ int main(int argc, char **argv)
 	
   // The world file name will be the first argument
   std::string output_dir, default_dir, mat_file;
-  std::string world, robot, frame;
-  int max_plan_iter, iter_count, max_plan_result;
+  std::string world, robot, frame, target_name;
+  int max_plan_iter, iter_count, max_plan_result, save_world;
 
   //load all ros param
   ros::init(argc, argv, "grasp_listener");
@@ -36,10 +36,12 @@ int main(int argc, char **argv)
   nh.getParam("default_dir", default_dir);
   nh.getParam("world", world);
   nh.getParam("frame", frame);
+  nh.getParam("target", target_name);
   nh.getParam("output_dir", output_dir);
   nh.getParam("max_plan_iter", max_plan_iter);
   nh.getParam("robot", robot);
   nh.getParam("iter_count", iter_count);
+  nh.getParam("save_world", save_world);
   nh.getParam("max_plan_result", max_plan_result);
   nh.getParam("mat_file", mat_file);
   std::cout << robot << std::endl;
@@ -72,14 +74,19 @@ int main(int argc, char **argv)
     std::string target_frame = frame;
     ros_clsData.clear();
     objectPoses.clear();
+    output_msg.header.frame_id = "";
     output_msg.poses.clear();
 
     for (int i = 1; i < YCB_classes.size(); i++)
     {
-      std::string source_frame = "00_" + YCB_classes[i] + "_world";
+      std::string source_frame = "00_" + YCB_classes[i];
       try
       {
-        listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+        // listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+        ros::Time now = ros::Time::now();
+        listener.waitForTransform(target_frame, source_frame, now, ros::Duration(0.2));
+        listener.lookupTransform(target_frame, source_frame, now, transform);
+
         ros_clsData.push_back(i);
 
         // rotation
@@ -96,31 +103,17 @@ int main(int argc, char **argv)
       }
     }
 
-    // look for gripper pose
-    std::string source_frame = "panda_hand_world";
-    try
-    {
-      listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
-
-      // rotation
-      tf::Quaternion tfQuat = transform.getRotation();
-
-      // translation
-      tf::Vector3 tfVec = transform.getOrigin();
-
-      gripperInitialPose = transf(Eigen::Quaterniond(tfQuat.w(), tfQuat.x(), tfQuat.y(), tfQuat.z()),
-        Eigen::Vector3d(tfVec.getX() * 1000, tfVec.getY() * 1000, tfVec.getZ() * 1000));
-    }
-    catch (tf::TransformException ex)
-    {
-      ROS_ERROR("%s", ex.what());
-    }
+    // gripper pose
+    gripperInitialPose = transf(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0), Eigen::Vector3d(0.0, 0.0, 0.0));
 
     // look for table pose
-    source_frame = "table_world";
+    std::string source_frame = "table_world";
     try
     {
-      listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+      // listener.lookupTransform(target_frame, source_frame, ros::Time(0), transform);
+      ros::Time now = ros::Time::now();
+      listener.waitForTransform(target_frame, source_frame, now, ros::Duration(0.2));
+      listener.lookupTransform(target_frame, source_frame, now, transform);
 
       // rotation
       tf::Quaternion tfQuat = transform.getRotation();
@@ -134,16 +127,21 @@ int main(int argc, char **argv)
     catch (tf::TransformException ex)
     {
       ROS_ERROR("%s", ex.what());
+      continue;
     }
 
     // if some object is detected
     if (ros_clsData.size() > 0) 
     {
       // print object info
+      object = -1;
       for (int i = 0; i < ros_clsData.size(); i++)
       {
         std::cout << YCB_classes[ros_clsData[i]] << " detected" << std::endl;
         std::cout << "TF: " << objectPoses[i] << " "  << std::endl;
+
+        if (YCB_classes[ros_clsData[i]] == target_name)
+          object = ros_clsData[i];
       }
 
       std::cout << "Hand TF: " << gripperInitialPose << std::endl;
@@ -153,17 +151,13 @@ int main(int argc, char **argv)
       // while(getchar() == '\n')
       //  break;
 
-      // sample one object as the target
-      if(!repeated)
-      {
-        int index = rand() % ros_clsData.size();
-        object = ros_clsData[index];
-      }
-      object = ros_clsData[0];
+      std::cout << ros_clsData.size() << " objects detected" << std::endl;
+      std::cout << "Target object: " << YCB_classes[object] << std::endl;
+      if (object == -1)
+        continue;
+      output_msg.header.frame_id = "00_" + YCB_classes[object];
 
       // Load the graspit world
-      std::string file_name = outputDirectory + "/" + YCB_classes[object] + "_grasp_pose.txt";
-      std::cout << file_name << std::endl;
       std::string initial_world_iv, initial_world_xml;
 
       // so that we can run multiple times for one configuration
@@ -210,10 +204,12 @@ int main(int argc, char **argv)
 
       for (int i = 0; i < iter_count; i++) 
       {
-				
-        graspitMgr->saveGraspItWorld(outputDirectory + "/worlds/startWorld_"  + std::to_string(i + 1) +  ".xml", createDir);
-        graspitMgr->saveInventorWorld(outputDirectory + "/worlds/startWorld_" + std::to_string(i + 1) +  ".iv", createDir);
-        std::cout << outputDirectory + "/worlds/startWorld_" << std::endl;
+	if (save_world)
+        {
+          graspitMgr->saveGraspItWorld(outputDirectory + "/worlds/startWorld_"  + std::to_string(i + 1) +  ".xml", createDir);
+          graspitMgr->saveInventorWorld(outputDirectory + "/worlds/startWorld_" + std::to_string(i + 1) +  ".iv", createDir);
+          std::cout << outputDirectory + "/worlds/startWorld_" << std::endl;
+        }
 
         SHARED_PTR<GraspIt::EigenGraspPlanner> planner(new GraspIt::EigenGraspPlanner("YCB_Grasp", graspitMgr)); //create
         int maxPlanningSteps = max_plan_iter;
@@ -232,12 +228,15 @@ int main(int argc, char **argv)
 
         std::vector<GraspIt::EigenGraspResult> allGrasps;
         planner->getResults(allGrasps);
-        planner->saveResultsAsWorldFiles(resultsWorldDirectory, filenamePrefix, saveGraspit, saveInventor, createDir);
+        if (save_world)
+        {
+          planner->saveResultsAsWorldFiles(resultsWorldDirectory, filenamePrefix, saveGraspit, saveInventor, createDir);
+          std::cout << outputDirectory << " " << filenamePrefix << std::endl;
+        }
 
         // Iterate through all results and print information about the grasps:
         std::cout << "Grasp results:" << std::endl;
         std::vector<GraspIt::EigenGraspResult>::iterator it;
-        std::cout << outputDirectory << " " << filenamePrefix << std::endl;
 
         for (it = allGrasps.begin(); it != allGrasps.end(); ++it)
         {
@@ -256,8 +255,8 @@ int main(int argc, char **argv)
           pose.orientation.y = orientation.y();
           pose.orientation.z = orientation.z();
           pose.orientation.w = orientation.w();
-          // if(energy < 45)
-          output_msg.poses.push_back(pose);
+          if(energy < 50)
+            output_msg.poses.push_back(pose);
         }
       }
 
