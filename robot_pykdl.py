@@ -391,7 +391,7 @@ def main():
     args = parser.parse_args()
     camera_intrinsics=np.array([[525, 0, 319.5],[ 0, 525, 239.5],[0, 0, 1]])    
     camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, \
-     -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
+               -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
     width = 640 
     height = 480
     camera_pos = np.array([0.6, -1.8, 1.2])
@@ -399,7 +399,7 @@ def main():
     mkdir_if_missing('test_image')
     renderer = YCBRenderer(width=width, height=height, render_marker=False, robot=args.robot)
     if args.robot == 'panda_arm':
-        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger', 'camera']
+        models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger']
         base_link = 'panda_link0'
         if args.test == 'middle':
             base_link = 'panda_link3'
@@ -514,8 +514,10 @@ def main():
             if joints is not None:
                 joints = rad2deg(joints)
                 joints_ = np.zeros(joints.shape[0] + 3)
-                joints_[:joints.shape[0]] = joints       
-                p_ = robot.solve_poses_from_joint(joints_[:-2], base_link, base_pose=np.eye(4))[-1]
+                joints_[:joints.shape[0]] = joints      
+                joints_[-2] = 0.04 * 180 / np.pi
+                joints_[-1] = 0.04 * 180 / np.pi
+                p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
                 print p_[:3, 3], pos
                 poses_p = robot.solve_poses_from_joint(np.array(joints_), base_link, base_pose=np.eye(4))
                 poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
@@ -525,6 +527,7 @@ def main():
                     rot = mat2quat(pose_i[:3,:3])
                     trans = pose_i[:3,3]
                     poses.append(np.hstack((trans,rot))) 
+                print len(poses), joints_.shape
                 renderer.set_poses(poses)
                 renderer.render(range(joints_.shape[0]), image_tensor, seg_tensor)
                 image_tensor = image_tensor.flip(0)
@@ -544,3 +547,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
