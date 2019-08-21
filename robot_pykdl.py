@@ -103,19 +103,19 @@ class robot_kinematics(object):
         self._ik_p_kdl = PyKDL.ChainIkSolverPos_NR(self._arm_chain, 
                                                     self._fk_p_kdl,
                                                     self._ik_v_kdl) 
-        print 'robot name {} with base link {}'.format(self._name, self._base_link)
-        print self._joint_name, self._joint_limits
+        print('robot name {} with base link {}'.format(self._name, self._base_link))
+        print(self._joint_name, self._joint_limits)
         
     def print_robot_description(self):
         nf_joints = 0
         for j in self._robot.joints:
             if j.type != 'fixed':
                 nf_joints += 1
-        print "URDF non-fixed joints: %d;" % nf_joints
-        print "URDF total joints: %d" % len(self._robot.joints)
-        print "URDF links: %d" % len(self._robot.links)
-        print "KDL joints: %d" % self._kdl_tree.getNrOfJoints()
-        print "KDL segments: %d" % self._kdl_tree.getNrOfSegments()
+        print("URDF non-fixed joints: %d;" % nf_joints)
+        print("URDF total joints: %d" % len(self._robot.joints))
+        print("URDF links: %d" % len(self._robot.links))
+        print("KDL joints: %d" % self._kdl_tree.getNrOfJoints())
+        print("KDL segments: %d" % self._kdl_tree.getNrOfSegments())
     
     def get_link_info(self):
         links = []; link_names = [self._base_link];
@@ -158,7 +158,7 @@ class robot_kinematics(object):
             segment_joint2tip.append(pose2np(segment.getFrameToTip()))
             initial_pose.append(pose2np(segment.pose(0)))
             if print_kdl_chain:
-                print '* ' + joint_name
+                print('* ' + joint_name)
             joints.append(joint_name)
 
         for joint in robot_description.joints:
@@ -269,7 +269,7 @@ class robot_kinematics(object):
                 lower_bound_check = joint_values[idx] >= self._joint_limits[joint_name][0]
                 upper_bound_check = joint_values[idx] <= self._joint_limits[joint_name][1]
                 if not (lower_bound_check and upper_bound_check):
-                    print "{} joint limits exceeded! value: {}".format(joint_name, joint_values[idx])
+                    print("{} joint limits exceeded! value: {}".format(joint_name, joint_values[idx]))
                     return False
         return True
 
@@ -449,26 +449,26 @@ def main():
         rand_base[:3,:3] = quat2mat(quat / np.linalg.norm(quat))
         poses_p, joint = robot.gen_rand_pose(base_link, base_pose=rand_base)[:len(cls_indexes)]
         joint_test = robot.solve_poses_from_joint(np.array(joint), base_link, base_pose=np.eye(4))
-        print 'joint test ==================='
-        print joint
-        print robot.solve_joint_from_poses(joint_test, base_link, base_pose=np.eye(4))
-        print '======================'
+        print('joint test ===================')
+        print(joint)
+        print(robot.solve_joint_from_poses(joint_test, base_link, base_pose=np.eye(4)))
+        print('======================')
 
-        print 'mesh center test ==================='
+        print('mesh center test ===================')
         poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link) 
         poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)  #center -> original pose
-        print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
+        print(deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4))))
 
         poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)  #original -> center pose
         poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link) 
-        print deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4)))
+        print(deg2rad(robot.solve_joint_from_poses(poses_p, base_link, base_pose=np.eye(4))))
 
-        print 'perturb test ==================='
+        print('perturb test ===================')
         poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=rand_base)
         poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
         poses_p = robot.offset_pose_center(poses_p, dir='on', base_link=base_link)
         poses_p, perturb = robot.perturb_pose(poses_p, base_link, base_pose=rand_base, center_offset=True)
-        print '======================'         
+        print('======================')
         
         poses = []
         for i in range(len(poses_p)):
@@ -492,7 +492,7 @@ def main():
         arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
         cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
         if args.test == 'all': 
-            print 'IK test ======================' 
+            print('IK test ======================')
             # ros quat xyzw | transforms3d wxyz
             _, joints = robot.gen_rand_pose(base_link)
             joints = deg2rad(joints[:7])
@@ -503,7 +503,7 @@ def main():
             if joints is not None:
                 p_ = robot.forward_position_kinematics(joint_values=joints) #
             else:
-                print 'no solution found by ik solver'
+                print('no solution found by ik solver')
             pos_view = renderer.V[:3,:3].dot(pos) + renderer.V[:3, 3]
             center = camera_intrinsics.dot(pos_view)
             center = center / center[2]
@@ -516,7 +516,7 @@ def main():
                 joints_ = np.zeros(joints.shape[0] + 3)
                 joints_[:joints.shape[0]] = joints       
                 p_ = robot.solve_poses_from_joint(joints_[:-2], base_link, base_pose=np.eye(4))[-1]
-                print p_[:3, 3], pos
+                print(p_[:3, 3], pos)
                 poses_p = robot.solve_poses_from_joint(np.array(joints_), base_link, base_pose=np.eye(4))
                 poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
                 poses = []
@@ -539,7 +539,7 @@ def main():
                 arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] 
 
                 cv2.imwrite( 'test_image/%06d-color.png' % index, arm_test_image) #over write
-            print '======================' 
+            print('======================')
 
 
 if __name__ == "__main__":
