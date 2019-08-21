@@ -106,20 +106,22 @@ def main():
     base_link = robot.get_root()
     end_link = robot.link_map.keys()[len(robot.links)-1]
     chain = tree.getChain(base_link, end_link)
-    print ef
-    # if args.file.name.split('_')[0] == 'panda':
-    #     chain = tree.getChain(base_link, 'panda_rightfinger')
-    #     for idx in xrange(chain.getNrOfSegments() - 1):
-    #         segment = chain.getSegment(idx)
-    #         print segment.getName()
-    #         print segment.getJoint().getName() #, 'initial pose: '
-    #         print segment.getFrameToTip()
-    #         print segment.getJoint().JointAxis()
-    #         #print segment.pose(0) #fix joint won't change with joint angle 
-    #         print 'left right finger'
-    #         print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
-    #         print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
-    #         print tree.getChain('panda_hand', 'panda_hand_camera').getSegment(0).pose(0.04)
-    #         print "Root link: %s; Random end link: %s" % (base_link, end_link)
+    print args.file.name
+    #if args.file.name.startswith('panda'):
+
+    chain = tree.getChain('panda_link6', 'panda_hand')
+    print chain.getNrOfSegments()
+    for idx in xrange(chain.getNrOfSegments()):
+        segment = chain.getSegment(idx)
+        #print segment.getName()
+        #print segment.getJoint().getName() #, 'initial pose: '
+        #print segment.getFrameToTip()
+        #print segment.getJoint().JointAxis()
+        print segment.pose(0) #fix joint won't change with joint angle 
+        #print 'left right finger'
+        #print tree.getChain('panda_hand', 'panda_rightfinger').getSegment(0).pose(0.04)
+        #print tree.getChain('panda_hand', 'panda_leftfinger').getSegment(0).pose(0.04)
+        #print tree.getChain('panda_hand', 'panda_hand_camera').getSegment(0).pose(0.04)
+        #print "Root link: %s; Random end link: %s" % (base_link, end_link)
 if __name__ == "__main__":
     main()

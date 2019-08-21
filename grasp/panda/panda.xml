@@ -50,5 +50,5 @@
 		<link dynamicJointType='Prismatic'>panda_rightfinger.xml</link>
 	</chain>
 	<eigenGrasps>eigen/eigen.xml</eigenGrasps>
-	<virtualContacts>virtual/contacts.xml</virtualContacts>
+	<virtualContacts>virtual/contacts_new.xml</virtualContacts>
 </robot>

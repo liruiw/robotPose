@@ -57,7 +57,7 @@ def get_grasp_scene(pose, object_pose, joint_val):
     pose_scene = [object_pose.dot(pose)] #gripper -> object
     joint = max(min((20 + joint_val)/1000, 0.04), 0) 
     joint *= 180 / np.pi
-    joint = np.array([joint, joint, joint]) 
+    joint = np.array([joint, joint]) 
     finger_poses = robot.solve_poses_from_joint(joint, 'panda_hand', pose_scene[0])
     pose_scene += finger_poses
     pose_scene = robot.offset_pose_center(pose_scene, dir='off', base_link='panda_link7') #offset hand as well
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         if cls == target:
             target_idx = i
         objs.append([name for name in os.listdir('models') if name.endswith(classes[cls])][0])
-    models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger', 'camera']
+    models = ['link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'link7', 'hand', 'finger', 'finger']
 
     obj_paths = [
         'panda_arm_models/{}.DAE'.format(item) for item in models]
@@ -245,7 +245,7 @@ if __name__ == '__main__':
     camera_extrinsics = object_pose[target_idx]   # which is the new camera pose from an z-up object 
     camera_extrinsics[:3, 3] = camera_extrinsics[:3, 3] + (np.array([-0.4, 0.2, 0.7]))
     inv_cam_pose = np.linalg.inv(camera_extrinsics)
-    gripperPose = robot.solve_poses_from_joint(np.zeros(11), 'panda_link0', curr_base_pose)[-1]
+    gripperPose = robot.solve_poses_from_joint(np.zeros(10), 'panda_link0', curr_base_pose)[-1]
 
     try:
         example_publish(curr_base_pose)

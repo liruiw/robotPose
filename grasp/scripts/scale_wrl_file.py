@@ -39,7 +39,7 @@ for obj in os.listdir('scripts/models'):
 
     holder_array = np.array(holder) 
     print holder_array.shape
-    with open("mesh/{}.xml".format(model_path), "w+") as xml:
+    with open("mesh/{}.xml".format(model_path), "w+") as xml: # can do scale factor 1000 instead 
         xml.write('<?xml version="1.0" ?>\n')
         xml.write('<root>\n')
         xml.write('\t<material>plastic</material>\n')
