@@ -2,6 +2,7 @@
 import numpy as np
 import PyKDL
 import scipy.io as sio
+import _init_paths
 from transforms3d.quaternions import quat2mat, mat2quat
 from transforms3d.euler import euler2mat, mat2euler, euler2quat
 from transforms3d.axangles import mat2axangle
@@ -80,7 +81,7 @@ class robot_kinematics(object):
         self._kdl_tree, ef_info = kdl_tree_from_urdf_model(self._robot)
         if base_link is None:
             self._tip_link = ef_info.keys()[0]
-            self._base_link = self._robot.get_root() 
+            self._base_link = self._robot.get_root()
         else:
             self._base_link = base_link
             self._tip_link = tip_link
@@ -104,7 +105,7 @@ class robot_kinematics(object):
                                                     self._fk_p_kdl,
                                                     self._ik_v_kdl) 
         print('robot name {} with base link {}'.format(self._name, self._base_link))
-        print(self._joint_name, self._joint_limits)
+        print self._joint_name, self._joint_limits
         
     def print_robot_description(self):
         nf_joints = 0
@@ -386,12 +387,12 @@ class robot_kinematics(object):
 
 def main():    
     parser = argparse.ArgumentParser()
-    parser.add_argument('--robot', type=str, default='baxter', help='Robot Name')
+    parser.add_argument('--robot', type=str, default='panda_arm', help='Robot Name')
     parser.add_argument('--test', type=str, default='all', help='Robot Name')
     args = parser.parse_args()
     camera_intrinsics=np.array([[525, 0, 319.5],[ 0, 525, 239.5],[0, 0, 1]])    
     camera_extrinsics=np.array([[-0.211719, 0.97654, -0.0393032, 0.377451],[0.166697, -0.00354316, \
-               -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
+     -0.986002, 0.374476],[-0.96301, -0.215307, -0.162036, 1.87315],[0,0, 0, 1]])
     width = 640 
     height = 480
     camera_pos = np.array([0.6, -1.8, 1.2])
@@ -408,13 +409,13 @@ def main():
         base_idx = 0
         name = base_link.strip().split('_')[-1]
         if name in models:
-            base_idx = models.index(name) + 1 #take the link name
+            base_idx = models.index(name) + 1 # take the link name
         obj_paths = [
             '{}_models/{}.DAE'.format(args.robot,item) for item in models]
         colors = [
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
-        cls_indexes = range(base_idx, len(models)) #7
+        cls_indexes = range(base_idx, len(models))
         robot = robot_kinematics(args.robot)
     elif args.robot == 'baxter':
         models = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2', 'electric_gripper_base', 'extended_narrow', 'extended_narrow']
@@ -428,8 +429,9 @@ def main():
         colors = [
             [0.1*(idx+1),0,0] for idx in range(len(models))]
         texture_paths = ['' for item in models]
-        cls_indexes = range(base_idx, len(models)) #7
+        cls_indexes = range(base_idx, len(models))
         robot = robot_kinematics(args.robot, 'right_arm_mount', 'right_gripper_base')
+
     renderer.load_objects(obj_paths, texture_paths, colors)
     renderer.set_camera_default()
     renderer.set_projection_matrix(640, 480, 525, 525, 319.5, 239.5, 0.001, 1000)
@@ -490,7 +492,7 @@ def main():
         test_img = np.zeros(image.shape)
         test_img[mask[:,:,2]!=0] = image[mask[:,:,2]!=0]
         arm_test_image[mask[:,:,2]!=0] = image[mask[:,:,2]!=0] #red channel
-        cv2.imwrite( 'test_image/%06d-color.png'%index,arm_test_image)
+        cv2.imwrite( 'test_image/%06d-color.png' % index, arm_test_image)
         if args.test == 'all': 
             print('IK test ======================')
             # ros quat xyzw | transforms3d wxyz
@@ -514,10 +516,8 @@ def main():
             if joints is not None:
                 joints = rad2deg(joints)
                 joints_ = np.zeros(joints.shape[0] + 3)
-                joints_[:joints.shape[0]] = joints      
-                joints_[-2] = 0.04 * 180 / np.pi
-                joints_[-1] = 0.04 * 180 / np.pi
-                p_ = robot.solve_poses_from_joint(joints_, base_link, base_pose=np.eye(4))[-1]
+                joints_[:joints.shape[0]] = joints       
+                p_ = robot.solve_poses_from_joint(joints_[:-2], base_link, base_pose=np.eye(4))[-1]
                 print(p_[:3, 3], pos)
                 poses_p = robot.solve_poses_from_joint(np.array(joints_), base_link, base_pose=np.eye(4))
                 poses_p = robot.offset_pose_center(poses_p, dir='off', base_link=base_link)
@@ -527,7 +527,6 @@ def main():
                     rot = mat2quat(pose_i[:3,:3])
                     trans = pose_i[:3,3]
                     poses.append(np.hstack((trans,rot))) 
-                print len(poses), joints_.shape
                 renderer.set_poses(poses)
                 renderer.render(range(joints_.shape[0]), image_tensor, seg_tensor)
                 image_tensor = image_tensor.flip(0)
